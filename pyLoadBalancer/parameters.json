@@ -1,0 +1,27 @@
+{
+ "_comment": "CONSTANTS FOR COMMUNICATION BETWEEN INSTANCES",
+ "SOCKET_TIMEOUT" : 500,
+ "WK_ERROR": {"WK": "ERROR"},
+ "WK_OK": {"WK": "OK"},
+ "LB_ERROR": {"LB": "ERROR"},
+ "LB_OK": {"LB": "OK"},
+
+ "_comment2": "LOAD BALANCER PARAMETERS",
+ "LB_IP": "127.0.0.1",
+ "LB_WKPULLPORT": 5699,
+ "LB_HCREPPORT" : 5999,
+ "LB_CLIENTPULLPORT" : 5799,
+
+ "_comment3" : "WORKERS PARAMETERS",
+ "WK_IP": "127.0.0.1",
+
+ "_comment4" : "COLOR OUTPUT",
+ "HEADER" : "\u001b[95m",
+ "OKBLUE" : "\u001b[94m",
+ "OKGREEN" : "\u001b[92m",
+ "WARNING" : "\u001b[93m",
+ "FAIL" : "\u001b[91m",
+ "ENDC" : "\u001b[0m",
+ "BOLD" : "\u001b[1m",
+ "UNDERLINE" : "\u001b[4m"
+}

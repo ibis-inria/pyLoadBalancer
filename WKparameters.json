@@ -1,0 +1,13 @@
+{
+ "HEADER" : "\u001b[95m",
+ "OKBLUE" : "\u001b[94m",
+ "OKGREEN" : "\u001b[92m",
+ "WARNING" : "\u001b[93m",
+ "FAIL" : "\u001b[91m",
+ "ENDC" : "\u001b[0m",
+ "BOLD" : "\u001b[1m",
+ "UNDERLINE" : "\u001b[4m",
+
+ "WK_STARTING_LBREPPORT": 5700,
+ "WK_STARTING_HCREPPORT": 6000
+}

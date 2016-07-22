@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="utf-8">
+    <title>Load Balancer Monitor</title>
+    <meta name="description" content="">
+    <meta name="author" content="">
+    
+	<link rel="stylesheet" href="/static/css/jquery-ui.min.css">
+    <script src="/static/js/jquery-3.0.0.js" type="text/javascript"></script>
+    <script src="/static/js/jquery-ui.min.js" type="text/javascript"></script>
+    <script src="/static/js/Chart.min.js" type="text/javascript"></script>
+    
+    <script>
+    	var queuesCharts = {}
+    	
+	    var charttemplate = {
+		    type: 'line',
+		    data: {
+		        datasets: [{}]
+		    },
+		    options: {
+		        scales: {
+		            xAxes: [{
+		                type: 'linear',
+		                position: 'bottom'
+		            }]
+		        },
+		        maintainAspectRatio: false
+		    
+		    }
+		}
+    	
+    	var templateQueueChart = {
+			    type: 'bar',
+			    data: {
+			    	labels: ["times (s)"],
+			        datasets: [
+			            {
+				            type: 'bar',
+		                    label: 'Current Waiting Time',
+		                    borderWidth: 0,
+		                    backgroundColor: "rgba(255,255,255,0)",
+		                    data: [2],
+		                    borderColor: 'white'
+				            },
+				        {
+				        	type: 'bar',
+			                label: 'Est. Queue Time',
+			                borderWidth: 0,
+			                backgroundColor: "rgba(192,75,192,1)",
+			                data: [5],
+			                borderColor: 'white',
+			                borderWidth: 2
+				            },
+				        
+			            {
+			            	type: 'line',
+			                label: 'Mean',
+			                borderWidth: 2,
+				            borderColor: "rgba(192,75,192,0)",
+    			            backgroundColor: "rgba(192,75,192,0)",
+    			            pointBorderColor: "rgba(192,75,192,1)",
+    			            pointBackgroundColor: "rgba(192,75,192,1)",
+    			            fill: false,
+    			            pointRadius: 30,
+    			            pointHoverRadius: 30,
+    			            pointStyle: 'line',
+				            data: [7]
+			        	},
+			            {
+			            	type: 'line',
+			                label: 'Max',
+			                borderWidth: 2,
+				            borderColor: "rgba(192,75,75,0)",
+    			            backgroundColor: "rgba(192,75,75,0)",
+    			            pointBorderColor: "rgba(192,75,75,1)",
+    			            pointBackgroundColor: "rgba(192,75,75,1)",
+    			            fill: false,
+    			            pointRadius: 30,
+    			            pointHoverRadius: 30,
+    			            pointStyle: 'line',
+				            data: [9]
+			        	}]
+			    },
+			    
+			    options: {
+			        scales: {
+			            xAxes: [{
+			                display: false,
+			                stacked : true
+			            }],
+			            yAxes: [{
+			                display: true,
+			                stacked : true
+			            }]
+			        },
+			        legend: {
+			            display: false
+			         }
+			    }
+			}
+    
+		$(document).ready(function () {
+
+            // initialize the viewer
+			(function worker() {
+				
+                var data = {iwouldlike: "WORKERS",};
+
+                var dataToSend = JSON.stringify(data);
+
+                $.ajax(
+                        {
+                            url: '/jsontoLB/',
+                            type: 'POST',
+                            data: dataToSend,
+
+                            success: function (jsonResponse) {
+                            	
+                                var objresponse = JSON.parse(jsonResponse);
+								
+                                $('#workerstable').find("tr:gt(0)").remove();
+                                $.each(objresponse.workers, function (i, worker) {
+                                    $('<tr>').append(
+                                    $('<td>').text(worker.workerid),
+                                    $('<td>').text(worker.workerip),
+                                    $('<td>').text(worker.workerport),
+                                    $('<td>').text(worker.workerhealthport),
+                                    $('<td width="100px">').html('<div class="progresscontainer"><div style="width:'+worker.workerCPU+'%; background-color: #DB3946;">'+worker.workerCPU+'</div></div>'),
+                                    $('<td>').text(worker.workertask),
+                                    $('<td width="100px">').html('<div class="progresscontainer"><div style="width:'+worker.workerdone+'%; background-color: #90ed7d;">'+worker.workerdone+'</div></div>')
+                                    ).appendTo('#workerstable');
+                                });
+                                
+                              
+
+                                
+                                $.each(objresponse.queues, function (i, queue) {
+                                	
+                                	if($("#queuesnames #" + queue).length == 0) {
+									  //The queue doesn't exists yet
+									    $('#queuesnames').append('<th id="'+queue+'">' + queue + '</th>');
+	                                	$('#queuesqueuing').append('<td id="'+queue+'">' + objresponse[queue].queuingtasks + '</td>');
+	                                	$('#queuesdone').append('<td id="'+queue+'">' + objresponse[queue].donetasks + '</td>');
+	                                	
+	                                	$('#queuestimes').append('<td style="height:250px" id="'+queue+'"><div style="width:100%; height:150px"><canvas id="'+queue+'Chart" width="100%"></canvas></div>	</td>')
+	                                	var queueChart = $("#"+queue+"Chart");
+	                                	console.log($("#"+queue+"Chart"))
+	                                	var dataQueueChart = templateQueueChart
+	                                	dataQueueChart["data"]["datasets"][0]['data'] = [objresponse[queue].queuetime]
+	                                	dataQueueChart["data"]["datasets"][1]['data'] = [objresponse[queue].totalesttime]
+	                                	dataQueueChart["data"]["datasets"][2]['data'] = [objresponse[queue].meantime]
+	                                	dataQueueChart["data"]["datasets"][3]['data'] = [objresponse[queue].maxtime - objresponse[queue].meantime]
+	                                	queuesCharts[queue] = new Chart(queueChart, dataQueueChart);
+	                                	console.log("DataSet" + dataQueueChart["data"]["datasets"][3]['data'])
+									}
+                                	else{
+                                		//The queue exists
+                                		console.log(queuesCharts[queue].data.datasets[0]['data'])
+                                		$("#queuesqueuing #" + queue).text(objresponse[queue].queuingtasks)
+                                		$("#queuesdone #" + queue).text(objresponse[queue].donetasks)
+                                		
+                                		queuesCharts[queue].data.datasets[0]['data'] = [objresponse[queue].queuetime]
+                                		queuesCharts[queue].data.datasets[1]['data'] = [objresponse[queue].totalesttime]
+                                		queuesCharts[queue].data.datasets[2]['data'] = [objresponse[queue].meantime]
+                                		queuesCharts[queue].data.datasets[3]['data'] = [objresponse[queue].maxtime - objresponse[queue].meantime]
+	                                	
+                                		queuesCharts[queue].update();
+                                		
+                                		
+                                	}
+
+                                	
+                                });
+                                
+                                
+                                
+		
+                            },
+                            error: function () {
+                            	console.log("Error loading JSON data");
+
+                            },
+                            complete: function() {
+                                // Schedule the next request when the current one's complete
+                                setTimeout(worker, 1000);
+                            }
+                        });
+			})(); //End function worker
+			
+			(function commands() {
+				
+                var data = {iwouldlike: "COMMANDS",};
+
+                var dataToSend = JSON.stringify(data);
+
+                $.ajax(
+                        {
+                            url: '/jsontoLB/',
+                            type: 'POST',
+                            data: dataToSend,
+
+                            success: function (jsonResponse) {
+                            	console.log("commands success");
+                                var objresponse = JSON.parse(jsonResponse);
+                                var chartdata = charttemplate
+                                var ctx = $("#commandsChart");
+                                
+                                $.each(objresponse, function (i, item) {
+                                	
+                                	chartdata["data"]["datasets"] = 	[{
+                			            label: item.command,
+                			            borderColor: "rgba(75,192,192,0)",
+                			            backgroundColor: "rgba(75,192,192,1)",
+                			            pointBorderColor: "rgba(75,192,192,1)",
+                			            pointBackgroundColor: "rgba(75,192,192,1)",
+                			            fill: false,
+                			            pointHoverRadius: 5,
+                			            data: item.timepoints
+                			            	
+                                	},
+                			        {
+                			            label: item.command,
+                			            borderColor: "rgba(192,75,192,1)",
+                			            backgroundColor: "rgba(192,75,192,1)",
+                			            pointBorderColor: "rgba(192,75,192,0)",
+                			            pointBackgroundColor: "rgba(192,75,192,0)",
+                			            fill: false,
+                			            pointHoverRadius: 5,
+                			            data: item.esttimepoints
+                			        }  
+                		        	]
+                                	
+                                	
+                                });
+                                
+                                var scatterChart = new Chart(ctx, chartdata);
+                                
+
+
+                            },
+                            error: function () {
+                            	console.log("Error loading JSON data");
+
+                            },
+                            complete: function() {
+                            	console.log("commands complete");
+                                // Schedule the next request when the current one's complete
+                                setTimeout(commands, 10000);
+                            }
+                        });
+			})(); //End function commands
+			
+		}); //End Document ready
+
+
+    </script>
+
+
+    <style>
+        html {
+            font: normal 13px "HelveticaNeue-Light", Helvetica, Georgia, sans-serif;
+        }
+
+        body {
+            font: normal 13px "HelveticaNeue-Light", Helvetica, Georgia, sans-serif;
+        }
+        h2, h1 {
+        	text-align: center;
+        }
+
+        th {
+            background-color: #303030;
+            color: white;
+        }
+        th,td {
+            align: center;
+            text-align : center;
+            padding : 5px 20px 5px 20px;
+        }
+
+        tr:nth-child(1) {
+            border: 1px solid #303030;
+            }
+
+        tr:nth-child(odd) {
+            background-color: #e2e2e2
+            }
+
+        table {
+            border: 1px solid #303030;
+            overflow-x:auto;
+            border-collapse: collapse;
+        }
+        .progresscontainer {
+            width: 100%;
+            border: 1px solid rgba(0,0,0,0.2);
+            }
+
+    </style>
+
+</head>
+
+
+<body id="bootstrap-js">
+<h1> Load Balancer Monitor</h1>
+
+<div  style="width:49vw; display:inline-block; float:right">
+	<h2> Workers </h2>
+	
+	<table id="workerstable" align="center" width="100%">
+	    <tr>
+	        <th>Name</th>
+	        <th>IP</th>
+	        <th>LB Port</th>
+	        <th>HC Port</th>
+	        <th>CPU</th>
+	        <th>Task</th>
+	        <th>Done</th>
+	    </tr>
+	</table>
+</div>
+                                
+<div align="center" style="width:49vw; display:inline-block; float:left">
+<h2> Statistics </h2>
+	<table id="queuestable" max-width="100%">
+		<tr id="queuesnames">
+			<th>&nbsp;</th>
+		</tr>
+		<tr id="queuesqueuing">
+			<td>Queuing Tasks</td>
+		</tr>
+		<tr id="queuesdone">
+			<td>Done Tasks</td>
+		</tr>
+		<tr id="queuestimes">
+			<td style="height:250px">Waiting Times</td>
+		</tr>
+	</table>
+</div>
+
+
+
+
+<div align="center" id="tabs" style="width:49vw; display:inline-block; float:left">
+	<h2> Learned Calculation Times </h2>
+    <div style="width:49vw; height:50vh"><canvas id="commandsChart" width="100%" height="100%"></canvas></div>		
+</div>
+
+
+
+
+</body>
+</html>
+
+
+
+
+
