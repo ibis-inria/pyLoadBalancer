@@ -1,2 +1,2 @@
 include *.md
-include *.json
+recursive-include *.json
