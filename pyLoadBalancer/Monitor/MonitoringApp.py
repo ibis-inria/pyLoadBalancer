@@ -84,6 +84,7 @@ def main():
     parser = argparse.ArgumentParser(description='Monitor Server Script for the pyLoadBalancer module.')
     parser.add_argument('-p', '--pfile', default=None, help='parameter file, in JSON format')
     parser.add_argument('-port', '--port', default=8000, help='web server port')
+    parser.add_argument('-a', '--adress', default='127.0.0.1', help='web server ip adress')
     args = parser.parse_args()
     with open(os.path.join(os.path.dirname(__file__), '../parameters.json'), 'r') as fp:
         CONSTANTS = json.load(fp)  # Loading default constants
@@ -103,7 +104,7 @@ def main():
     setLBReqSock(LBReqSock)
 
     app = Application()
-    app.listen(options.port)
+    app.listen(options.port, address=args.adress)
     tornado.ioloop.IOLoop.instance().start()
 
 
