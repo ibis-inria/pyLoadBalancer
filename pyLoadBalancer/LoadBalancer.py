@@ -10,7 +10,7 @@ The Load Balancer can be either directly launch from a console :
 Or it can be imported as a module :
     from JSONLoadBalancer import LoadBalancer
     LB = LoadBalancer()
-    LB.startLB(log=True)
+    LB.startLB()
 
 Note that all the parameters necessary for the different elements (LoadBalancer, HealthCheck, Worker, Client) to communicate are given in the 'parameters.json' file.
 """
@@ -20,12 +20,11 @@ import zmq
 import os.path
 import json
 import numpy as np
+from .colorprint import cprint, bcolors
+import sys
+import argparse
 
 __all__ = ['LoadBalancer'] #Only possible to import Client
-
-# Constants definitions
-with open(os.path.join(os.path.dirname(__file__), 'parameters.json'), 'r') as fp:
-    CONSTANTS = json.load(fp)
 
 def argsort(seq):
     # http://stackoverflow.com/questions/3071415/efficient-method-to-calculate-the-rank-vector-of-a-list-in-python
@@ -75,7 +74,24 @@ class Queue:
 
 
 class LoadBalancer:
-    def __init__(self,log=False, queues=[{'maxallowedtime':1,'lowP':True,'highP':True},{'maxallowedtime':1e10,'lowP':True,'highP':False}]):
+    def __init__(self,parametersfile= None, queues=[{'maxallowedtime':1,'lowP':True,'highP':True},{'maxallowedtime':1e10,'lowP':True,'highP':False}]):
+
+        ### Constants definitions ###
+        with open(os.path.join(os.path.dirname(__file__), 'parameters.json'), 'r') as fp:
+            self.CONSTANTS = json.load(fp) #Loading default constants
+
+        if parametersfile != None:
+            try:
+                with open(parametersfile, 'r') as fp:
+                    self.CONSTANTS.update(json.load(fp)) #updating constants with user defined ones
+            except:
+                cprint('ERROR : %s is not a valid JSON file'%parametersfile, 'FAIL')
+                sys.exit()
+
+        print('pyLoadBalancer')
+        cprint('Starting Load Balancer with the folllowing settings : ', 'OKGREEN')
+        for keys, values in self.CONSTANTS.items():
+            print(bcolors.OKBLUE,'   ', keys, ':',bcolors.ENDC, values)
 
         self.learnTimes = {}
 
@@ -85,19 +101,16 @@ class LoadBalancer:
         for queue in queues:
             self.queues.append( Queue(queue['maxallowedtime'],queue['highP'],queue['lowP']) )
 
-        self.log = log
-
-
         self.context = zmq.Context()
 
         self.workerStateSock = self.context.socket(zmq.PULL)
-        self.workerStateSock.bind("tcp://"+CONSTANTS['LB_IP']+":" + str(CONSTANTS['LB_WKPULLPORT']))
+        self.workerStateSock.bind("tcp://"+self.CONSTANTS['LB_IP']+":" + str(self.CONSTANTS['LB_WKPULLPORT']))
 
         self.clientPullSock = self.context.socket(zmq.PULL)
-        self.clientPullSock.bind("tcp://"+CONSTANTS['LB_IP']+":" + str(CONSTANTS['LB_CLIENTPULLPORT']))
+        self.clientPullSock.bind("tcp://"+self.CONSTANTS['LB_IP']+":" + str(self.CONSTANTS['LB_CLIENTPULLPORT']))
 
         self.healthSock = self.context.socket(zmq.REP)
-        self.healthSock.bind("tcp://"+CONSTANTS['LB_IP']+":" + str(CONSTANTS['LB_HCREPPORT']))
+        self.healthSock.bind("tcp://"+self.CONSTANTS['LB_IP']+":" + str(self.CONSTANTS['LB_HCREPPORT']))
 
         self.poller = zmq.Poller()
         self.poller.register(self.workerStateSock, zmq.POLLIN)
@@ -105,8 +118,8 @@ class LoadBalancer:
         self.poller.register(self.clientPullSock, zmq.POLLIN)
 
     def resetWorkerSocket(self,workerid):
-        self.workers[workerid]['workersocket'].setsockopt(zmq.RCVTIMEO, CONSTANTS['SOCKET_TIMEOUT'])  # Time out when asking worker
-        self.workers[workerid]['workersocket'].setsockopt(zmq.SNDTIMEO, CONSTANTS['SOCKET_TIMEOUT'])
+        self.workers[workerid]['workersocket'].setsockopt(zmq.RCVTIMEO, self.CONSTANTS['SOCKET_TIMEOUT'])  # Time out when asking worker
+        self.workers[workerid]['workersocket'].setsockopt(zmq.SNDTIMEO, self.CONSTANTS['SOCKET_TIMEOUT'])
         self.workers[workerid]['workersocket'].setsockopt(zmq.LINGER, 0)  # Time before closing socket
         self.workers[workerid]['workersocket'].setsockopt(zmq.REQ_RELAXED, 1)
         self.workers[workerid]['workersocket'].connect('tcp://' + self.workers[workerid]['workerip'] + ':' + str(self.workers[workerid]['workerport']))
@@ -121,20 +134,19 @@ class LoadBalancer:
         self.workers[workerid]['learningParam'] = None
         self.workers[workerid]['workersocket'] = self.context.socket(zmq.REQ)
         self.resetWorkerSocket(workerid)
-        print('WORKER '+ workerid + ' ADDED : ', self.workers[workerid])
 
     def askWorkerReady(self,workerid):
         try:
             self.workers[workerid]['lasttasktime'] = time.time()
             self.workers[workerid]['workersocket'].send_json({'TASK': 'READY?'})
-            if self.workers[workerid]['workersocket'].recv_json() == CONSTANTS['WK_OK']:
+            if self.workers[workerid]['workersocket'].recv_json() == {'WK':'OK'}:
                 self.workers[workerid]['workerstate'] = 100
             else:
                 self.workers[workerid]['workerstate'] = 0
 
         except Exception as e:
             del self.workers[workerid]
-            print(CONSTANTS['FAIL'],'LB - REMOVING WORKER %s : NO ANSWER TO READY QUESTION' % workerid, str(e),CONSTANTS['ENDC'])
+            cprint('LB - REMOVING WORKER %s - NO ANSWER TO READY QUESTION : %s' % (workerid, str(e)),'FAIL')
             pass
 
 
@@ -151,7 +163,7 @@ class LoadBalancer:
                                 taskmsg = queue.tasks[0]
                                 self.workers[workerid]['workersocket'].send_json(taskmsg)
                                 answer = self.workers[workerid]['workersocket'].recv_json()
-                                if answer == CONSTANTS['WK_OK']:
+                                if answer == {'WK':'OK'}:
                                     waitingtime = time.time() - queue.tasksSubmissionTimes[0]
                                     queue.maxWaitTime = max(queue.maxWaitTime,  waitingtime)
                                     queue.meanWaitTime = (queue.meanWaitTime * queue.tasksDone + waitingtime)/ (queue.tasksDone + 1)
@@ -164,12 +176,10 @@ class LoadBalancer:
                                     self.workers[workerid]['learningCommand'] = taskmsg['TASK']
                                     self.workers[workerid]['learningParam'] = taskmsg['learningParam']
                                 else:
-                                    print(CONSTANTS['WARNING'], 'LB - WORKER ', workerid,
-                                          'DID NOT TAKE TASK - stay in queue', CONSTANTS['ENDC'])
+                                    cprint('LB - WORKER %s DID NOT TAKE TASK - stay in queue' % workerid, 'WARNING')
 
                             except Exception as e:
-                                print(CONSTANTS['FAIL'], 'LB - CAN\'T SEND TASK TO WORKER', workerid, str(e),
-                                      CONSTANTS['ENDC'])
+                                cprint('LB - CAN\'T SEND TASK TO WORKER %s : %s' % (workerid, str(e)), 'FAIL')
                                 self.workers[workerid]['workersocket'].disconnect(
                                     'tcp://' + self.workers[workerid]['workerip'] + ':' + str(
                                         self.workers[workerid]['workerport']))
@@ -196,8 +206,7 @@ class LoadBalancer:
                         self.workers[msg['workerid']]['workercpustate'] = msg['workercpustate']
                 elif (msg['workerstate'] == "HELLO"):
                     if (msg['workerid'] not in self.workers):
-                        print(CONSTANTS['OKBLUE'], "LB - RECEIVED HELLO MESSAGE FROM AN UNKWONN WORKER (%s). ADDING WORKER" %
-                              msg['workerid'],CONSTANTS['ENDC'])
+                        cprint("LB - RECEIVED HELLO MESSAGE FROM AN UNKWONN WORKER (%s). ADDING WORKER" % msg['workerid'], 'OKBLUE')
                         self.addWorker(msg)
                         self.askWorkerReady(msg['workerid'])
                 else:
@@ -230,12 +239,12 @@ class LoadBalancer:
                                                             'lasttasktime': self.workers[workerid]['lasttasktime']} for
                                                  workerid in self.workers})
                     elif msg['HEALTH'] == 'DOWNWORKER':
-                        self.healthSock.send_json(CONSTANTS['LB_OK'])
+                        self.healthSock.send_json({'LB':'OK'})
                         if msg['workerid'] in self.workers:
-                            print(CONSTANTS['FAIL'], 'LB - Worker ', msg['workerid'], ' is DOWN. Removing it', CONSTANTS['ENDC'])
+                            cprint('LB - Worker %s is DOWN. Removing it'%msg['workerid'], 'FAIL')
                             del self.workers[msg['workerid']]
                     else:
-                        self.healthSock.send_json(CONSTANTS['LB_ERROR'])
+                        self.healthSock.send_json({'LB':'ERROR'})
 
                 ### MESSAGE COMING FROM MONITOR ###
                 if 'MONITOR' in msg:
@@ -305,11 +314,10 @@ class LoadBalancer:
 
                     if msg['TASK'] in self.learnTimes:
                         estimatedtime =  self.learnTimes[msg['TASK']].guessTime(msg['learningParam'])
-                        print(CONSTANTS['OKBLUE'], 'LB - TASK %s WITH PARAM %f WILL TAKE ABOUT %f sec ' % (msg['TASK'],msg['learningParam'],estimatedtime),
-                              CONSTANTS['ENDC'])
+                        cprint('LB - TASK %s WITH PARAM %f WILL TAKE ABOUT %f sec ' % (msg['TASK'],msg['learningParam'],estimatedtime),'OKBLUE')
                     else:
                         estimatedtime = self.queues[-1].maxAllowedTime
-                        print(CONSTANTS['OKBLUE'], 'LB - TASK %s HAS NO ESTIMATED TIME, time set to ', estimatedtime, 's',CONSTANTS['ENDC'])
+                        cprint('LB - TASK %s HAS NO ESTIMATED TIME, time set to %ss'%estimatedtime, 'OKBLUE')
 
                     nqueue = 0
                     for nqueue,queue in enumerate(self.queues):
@@ -334,8 +342,10 @@ class LoadBalancer:
 
 
 def main():
-    print('Launching pyLoadBalancer : Load Balancer')
-    LB = LoadBalancer(log=True)
+    parser = argparse.ArgumentParser(description='Health Check Script for the pyLoadBalancer module.')
+    parser.add_argument('-p', '--pfile', default=None, help='parameter file, in JSON format')
+    args = parser.parse_args()
+    LB = LoadBalancer(parametersfile=args.pfile)
     LB.startLB()
 
 if __name__ == '__main__':

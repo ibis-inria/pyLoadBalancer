@@ -32,21 +32,30 @@ import zmq
 import os.path
 import psutil
 import sys
+from .colorprint import cprint, bcolors
 
 
 
 __all__ = ['Worker'] #Only possible to import Client
 
-
-with open(  os.path.join(os.path.dirname(__file__),'parameters.json') , 'r') as fp:
-    CONSTANTS = json.load(fp)
-
-
 class Worker:
-    def __init__(self, id, lbrepport, healthport, priority = 0):
+    def __init__(self, id, ip, lbrepport, healthport, priority = 0, parametersfile=None):
+        ### Constants definitions ###
+        with open(os.path.join(os.path.dirname(__file__), 'parameters.json'), 'r') as fp:
+            self.CONSTANTS = json.load(fp) #Loading default constants
+
+        if parametersfile != None:
+            try:
+                with open(parametersfile, 'r') as fp:
+                    self.CONSTANTS.update(json.load(fp)) #updating constants with user defined ones
+            except:
+                cprint('ERROR : %s is not a valid JSON file'%parametersfile, 'FAIL')
+                sys.exit()
+
         self.setProcessPriority(priority)
 
         self.id = id
+        self.ip = ip
         self.taskList = {}
 
         self.context = zmq.Context()
@@ -54,13 +63,13 @@ class Worker:
         self.healthport = healthport
 
         self.pushStateSock = self.context.socket(zmq.PUSH)
-        self.pushStateSock.connect('tcp://' + CONSTANTS['LB_IP'] + ':' + str(CONSTANTS['LB_WKPULLPORT']))
+        self.pushStateSock.connect('tcp://' + self.CONSTANTS['LB_IP'] + ':' + str(self.CONSTANTS['LB_WKPULLPORT']))
 
         self.LBrepSock = self.context.socket(zmq.REP)
-        self.LBrepSock.bind('tcp://' + CONSTANTS['WK_IP'] + ':' + str(self.lbrepport))
+        self.LBrepSock.bind('tcp://' + ip + ':' + str(self.lbrepport))
 
         self.HCrepSock = self.context.socket(zmq.REP)
-        self.HCrepSock.bind('tcp://' + CONSTANTS['WK_IP'] + ':' + str(self.healthport))
+        self.HCrepSock.bind('tcp://' + ip + ':' + str(self.healthport))
 
         self.poller = zmq.Poller()
         self.poller.register(self.LBrepSock, zmq.POLLIN)
@@ -99,14 +108,14 @@ class Worker:
         if taskname not in self.taskList:
             self.taskList[taskname] = {'funct':taskfunct, 'kwargs':kwargs}
         else:
-            print(CONSTANTS['FAIL'],'TASK %s ALREADY EXISTS, SKIPPING addTask' % taskname,CONSTANTS['ENDC'])
+            cprint('TASK %s ALREADY EXISTS, SKIPPING addTask' % taskname, 'FAIL')
 
     def rmvTask(self, taskname):
         if taskname in self.taskList:
             del self.taskList[taskname]
 
     def sendState(self, percentDone, to='LB'):
-        message = {'workerid': self.id, 'workerip': CONSTANTS['WK_IP'], 'workerport': self.lbrepport,
+        message = {'workerid': self.id, 'workerip': self.ip, 'workerport': self.lbrepport,
                                  'workerhealthport': self.healthport, 'workerstate': percentDone, 'workerpriority' : self.priority}
         if to == 'LB':
             self.pushStateSock.send_json(message)
@@ -126,13 +135,19 @@ class Worker:
             self.pushStateSock.send_json(message)
 
     def startWK(self):
-        print(CONSTANTS['OKGREEN'], 'WORKER ', self.id, ' WITH PRIORITY %d STARTED on %s | LBrepPort : %d | HCrepPort : %d' % (self.priority, CONSTANTS['WK_IP'],self.lbrepport,self.healthport), CONSTANTS['ENDC'])
+        cprint('Starting Worker %s : '%self.id, 'OKGREEN')
+        print(bcolors.OKBLUE, '    WK_IP:', bcolors.ENDC, self.ip)
+        print(bcolors.OKBLUE, '    WK_LBport:', bcolors.ENDC, self.lbrepport)
+        print(bcolors.OKBLUE, '    WK_HCport:', bcolors.ENDC, self.healthport)
+        print(bcolors.OKBLUE, '    WK_PRIORITY:', bcolors.ENDC, self.priority)
+        for keys, values in self.CONSTANTS.items():
+            print(bcolors.OKBLUE,'   ', keys, ':',bcolors.ENDC, values)
 
         while True:
             self.sayHello()
             sockets = dict(self.poller.poll(10000))
             if not sockets:
-                print(CONSTANTS['OKBLUE'], self.id, ' - ', time.time(), ' - NOTHING TO DO', CONSTANTS['ENDC'])
+                cprint('%s - %s - NOTHING TO DO' % (self.id, time.strftime('%H:%M:%S')), 'OKBLUE')
                 self.sendCPUState()
                 self.sendState(100)
 
@@ -140,20 +155,20 @@ class Worker:
                 msg = self.LBrepSock.recv_json()
                 # print(id, " received %r" % msg)
                 if msg['TASK'] == 'READY?':
-                    self.LBrepSock.send_json(CONSTANTS['WK_OK'])
+                    self.LBrepSock.send_json({'WK':'OK'})
 
                 elif msg['TASK'] == 'EXIT':
-                    self.LBrepSock.send_json(CONSTANTS['WK_OK'])
+                    self.LBrepSock.send_json({'WK':'OK'})
                     break
 
                 elif msg['TASK'] in self.taskList:
                     msg.pop('HELLO')
-                    self.LBrepSock.send_json(CONSTANTS['WK_OK'])
+                    self.LBrepSock.send_json({'WK':'OK'})
                     #SENDING TASK TO TASK FUNCTION
                     self.taskList[msg['TASK']]['funct'](task=msg,arguments=self.taskList[msg['TASK']]['kwargs'])
                 else:
-                    print(CONSTANTS['FAIL'], 'WORKER ', self.id, ' UNKNOWN COMMAND ', msg['TASK'], CONSTANTS['ENDC'])
-                    self.LBrepSock.send_json(CONSTANTS['WK_ERROR'])
+                    cprint('WORKER %s - UNKNOWN COMMAND %s'% (self.id, msg['TASK']), 'FAIL')
+                    self.LBrepSock.send_json({'WK':'ERROR'})
                 self.sendCPUState()
                 self.sendState(100)
 
