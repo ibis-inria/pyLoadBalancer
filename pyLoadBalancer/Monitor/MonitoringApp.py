@@ -14,9 +14,6 @@ import argparse
 import sys
 from tornado.options import define, options
 
-
-define("port", default=8000, help="run on the given port", type=int)
-
 context = zmq.Context()
 LB_HEALTHADRESS = None
 LBReqSock = None
@@ -86,7 +83,7 @@ def main():
 
     parser = argparse.ArgumentParser(description='Monitor Server Script for the pyLoadBalancer module.')
     parser.add_argument('-p', '--pfile', default=None, help='parameter file, in JSON format')
-    parser.add_argument('-port', '--port', default=None, help='web server port')
+    parser.add_argument('-port', '--port', default=8000, help='web server port')
     args = parser.parse_args()
     with open(os.path.join(os.path.dirname(__file__), '../parameters.json'), 'r') as fp:
         CONSTANTS = json.load(fp)  # Loading default constants
@@ -99,7 +96,7 @@ def main():
             cprint('ERROR : %s is not a valid JSON file' % args.pfile, 'FAIL')
             sys.exit()
 
-    define("port", default=8000, help="run on the given port", type=int)
+    define("port", default=args.port, help="run on the given port", type=int)
 
     LB_HEALTHADRESS = 'tcp://' + CONSTANTS['LB_IP'] + ':' + str(CONSTANTS['LB_HCREPPORT'])
     LBReqSock = context.socket(zmq.REQ)
