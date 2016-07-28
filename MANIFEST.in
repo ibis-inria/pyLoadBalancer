@@ -1,2 +1,3 @@
 include *.md
-recursive-include *.json
+include pyLoadBalancer/*.json
+recursive-include pyLoadBalancer/Monitor *
