@@ -6,18 +6,23 @@ Home-page: UNKNOWN
 Author: Yannick Martin
 Author-email: UNKNOWN
 License: WTFPL
-Description: # JSONLoadBalancer
+Description: # pyLoadBalancer
         
         This package contains a LoadBalancer that allows a list of tasks to be distributed to Workers.
         
         ## Install
         
-        ...
+        To install the pyLoadBalancer package, simply run :
+        ```
+        python setup.py install
+        ```
         
         ## Getting Started
         
         
         The following scheme explains the use of the package :
+        
+        ```
         
                                +--------------+
                                |              |     info     +----------+
@@ -39,40 +44,41 @@ Description: # JSONLoadBalancer
                                                              +----------+
                                                                  ...
         
+        ```
+        
         ## Classes
         
         The JSONLoadBalancer Package contains 4 main classes:
-           -The Client, that send tasks
-           -The Worker, that receive tasks
-           -The Load Balancer, that distribute tasks
-           -The Helth Check, that monitor the Load Balancer and the Workers status
+        1. The Load Balancer, that distribute tasks
+        2. The Helth Check, that monitors the Load Balancer
+        3. The Client, that send tasks
+        4. The Worker, that receive tasks
         
         All the messages between the classes are exchanged in json format.
         
-        ## Starts the Load Balancer
+        ## Starting the Load Balancer
         
-        To start the LoadBalancer, open two python consoles.
-        In the first :
+        To start the LoadBalancer, two python scripts need to be executed :
         
-        ```python
-        from JSONLoadBalancer import LoadBalancer
-        LB = LoadBalancer()
-        LB.startLB(log=True)
+        1. The LoadBalancer itself. Simply call the following script from command line :
+        ```sh
+        pyLoadBalancer_LB
         ```
-        
-        In the second :
-        
-        ```python
-        from JSONLoadBalancer import HealthCheck
-        HC = HealthCheck(log=True)
-        HC.startHC()
+        2. The HealthCheck module that is launched by :
+        ```sh
+        pyLoadBalancer_HC
         ```
+        You should see the HealthCheck exchanging information with the LoadBalancer. As there is still no workers to do the job, the HealthCheck should print the following warning :
+        >HC - WARNING : LB HAS NO WORKERS.  
         
-        This will starts the LoadBalancer and the HealthCheck
+        If you get a error message, please check that the two scripts are running, and if yes, check your firewall settings
         
-        ## Define Workers
+        Note that it is possible to execute the HealthCheck script on another computer than the LoadBalancer one. See advanced uses.
         
-        To create a worker, use the following syntax :
+        ## Defining Workers
+        
+        Now the LoadBalancer core is running, workers have to be run. Workers are configured to connected automatically to the Load Balancer.  
+        Insert a worker to your python application by using the following syntax :
         
         ```python
         from JSONLoadBalancer import Worker
@@ -80,55 +86,66 @@ Description: # JSONLoadBalancer
         ```
         
         Where :
-          - `id` (string) is the worker unique id.
+          - `id` (string) is the worker unique id (using same id for two different workers will lead to at best only one active worker.)
           - `lbport` (int) and `healthport` (int) are two ports listened by the worker in order to receive task from the Load Balancer and receive message from the Health Check
         
-        Then you will add tasks the worker should do.
+        Then you will redirect the task the worker will receive to the corresponding python function that will do the job.
         
         ```python
         WK.addTask('DIAG',diagTask)
         ```
         
-        Here, when the worker receive a task named `'DIAG'`, it will call the diagTask function.
-        A task function must be in the form `taskFunction(**kwargs)` :
-            the first kwargs argurments will be `kwargs['tasks']` and contains the task message coming from the Client.
+        Here, when the worker receive a task named `'DIAG'`, it will call the diagTask function.  
+        A task function must be in the form :
+        ```python
+        def taskFunction(**kwargs):
+            task = kwargs['tasks']
+            #do something with task
+            return
+        ```
+        The first kwargs argurments will be `kwargs['tasks']` and contains the task message coming from the Client.
         
         Then, when all tasks are defined, start the worker using :
         ```python
         WK.startWK()
         ```
         
-        ## Start Client
+        ## Starting Client
         
-        To create a client, use the following syntax :
+        Now we have a pretty consistent Load Balancer with active workers. Let's execute the Client side that will send task to the Load Balancer. Use the following syntax :
         
         ```python
         from JSONLoadBalancer import Client
         CL = Client()
         ```
         
-        Then create the tasks you want to send. A task is a dict that must contains a key named `'TASK'` :
+        Then create the task you want to send. It simply is a python dictionnary that contains the description of the task to be done :
         
         ```python
         task = {'data': '/scratch/data/matrix19160.npy', 'load': 12}
         ```
         
-        You can then organize your task dict as you want, as long as the Workers are programmed to be able to understand it.
-        There are two reserved keys, that are `'HELLO'` and `'TASK'`, your task dict should not contain these two keys.
+        The dictionnary must be JSON serializable, because sockets are using json format to communicate between eachothers.  
+        Note that there are two reserved keys, that are `'HELLO'` and `'TASK'`, your task dict should not contain these two keys.
+        
         When the task is to be sent, send it using :
         
         ```python
         CL.sendTask(taskname,task)
         ```
         
-        Where `taskname` (string) is the name of the task (your workers should also have a function that is able to read a task having this name)
-        The client interface will add two keys to the task dict :
-            ```python{'HELLO' : 'TOWORKER'}``` in order to tell the Load Balancer that this is a task to be done by a Worker.
-            ```python{'TASK' : taskname}``` to describe the task to be done by the worker
+        Where `taskname` (string) is the name of the task (the one you set for the worker side)  
         
-        ## Advance usages
+        ## Monitoring
+        A monitoring interface is available to easilly monitor the Load Balancer status (queing task, worker socket)
         
-        ...
+        ## Advanced usages
+        
+        - Update worker state: if long task, can send socket to LB to send worker state
+        - More than one queue (manual sending to given queue by client)
+        - Learning parameters (automatic queue selection by LB)
+        - 
+        - ...
         
         ## Licence
         

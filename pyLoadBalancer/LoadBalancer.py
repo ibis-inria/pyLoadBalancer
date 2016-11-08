@@ -23,6 +23,7 @@ import numpy as np
 from .colorprint import cprint, bcolors
 import sys
 import argparse
+import uuid
 
 __all__ = ['LoadBalancer'] #Only possible to import Client
 
@@ -59,19 +60,71 @@ class learnTaskTimes:
     def guessTime(self, param):
         return self.timesfit(param)
 
+class LBWorker:
+    def __init__(self, workerinfo, zmqcontext):
+        workerid = workerinfo['workerid']
+        self.workerinfo = workerinfo
+        self.workerstate = 0
+        self.workercpustate = 100
+        self.lasttasktime = time.time()
+        self.taskname  = None
+        self.workersocket = zmqcontext.socket(zmq.REQ)
+        self.resetWorkerSocket()
+
+    def resetWorkerSocket(self):
+        self.workersocket.setsockopt(zmq.RCVTIMEO, self.CONSTANTS['SOCKET_TIMEOUT'])  # Time out when asking worker
+        self.workersocket.setsockopt(zmq.SNDTIMEO, self.CONSTANTS['SOCKET_TIMEOUT'])
+        self.workersocket.setsockopt(zmq.LINGER, 0)  # Time before closing socket
+        self.workersocket.setsockopt(zmq.REQ_RELAXED, 1)
+        self.workersocket.connect('tcp://' + self.workerinfo['workerip'] + ':' + str(self.workerinfo['workerport']))
+
+    def refreshState(self): #def askWorkerReady(self,workerid):
+        try:
+            self.lasttasktime = time.time()
+            self.workersocket.send_json({'TASK': 'READY?'})
+            if self.workersocket.recv_json() == {'WK':'OK'}:
+                self.workerstate = 100
+            else:
+                self.workerstate = 0
+            return True
+
+        except Exception as e:
+            return False
+            #TO DO : DELETE WORKER del self.workers[workerid]
+            cprint('LB - REMOVING WORKER %s - NO ANSWER TO READY QUESTION : %s' % (workerid, str(e)),'FAIL')
+            pass
+
+
+class Task:
+    def __init__(self, taskid, taskname, taskdict, priority):
+        self.taskid = taskid
+        self.taskname = taskname
+        self.taskdict = taskdict
+        self.priority = priority
+        self.submissiontime = time.time()
+        self.progress = 0
+        self.workerresult = None
+        self.resulttime = None
+        self.deletetime = time.time() + 48*60*60 #autodelete in 48 hours
+
 class Queue:
-    def __init__(self, maxAllowedTime, highP=False, lowP=True):
+    def __init__(self):
         self.tasks = []
-        self.tasksSubmissionTimes = []
-        self.tasksEstCalculTimes = []
-        self.tasksDone = 0
-        self.meanWaitTime = 0
+        self.tasksDone = {'taskname':[],'priority':[],'waitingtime':[]}
         self.maxWaitTime = 0
-        self.highP = highP
-        self.lowP = lowP
 
-        self.maxAllowedTime = maxAllowedTime
+    def addTask(self, taskname, taskdict, priority):
+        taskid = str(uuid.uuid4())
+        self.tasks.append( Task(taskid, taskname, taskdict, priority) )
+        return taskid
 
+    def removeTask(self, taskid):
+        for i in range(len(self.tasks)):
+            if (self.tasks[i].taskid == taskid):
+                self.tasks.pop(i)
+                return True
+        else:
+            return False
 
 class LoadBalancer:
     def __init__(self,parametersfile= None, queues=[{'maxallowedtime':1,'lowP':True,'highP':True},{'maxallowedtime':1e10,'lowP':True,'highP':False}]):
@@ -93,21 +146,20 @@ class LoadBalancer:
         for keys, values in self.CONSTANTS.items():
             print(bcolors.OKBLUE,'   ', keys, ':',bcolors.ENDC, values)
 
-        self.learnTimes = {}
-
         self.workers = {}
 
-        self.queues = []
-        for queue in queues:
-            self.queues.append( Queue(queue['maxallowedtime'],queue['highP'],queue['lowP']) )
+        self.queue = Queue()
+        self.pendingtasks = {}
+        self.donetasks = {}
+
 
         self.context = zmq.Context()
 
         self.workerStateSock = self.context.socket(zmq.PULL)
         self.workerStateSock.bind("tcp://"+self.CONSTANTS['LB_IP']+":" + str(self.CONSTANTS['LB_WKPULLPORT']))
 
-        self.clientPullSock = self.context.socket(zmq.PULL)
-        self.clientPullSock.bind("tcp://"+self.CONSTANTS['LB_IP']+":" + str(self.CONSTANTS['LB_CLIENTPULLPORT']))
+        self.clientSock = self.context.socket(zmq.REP)
+        self.clientSock.bind("tcp://"+self.CONSTANTS['LB_IP']+":" + str(self.CONSTANTS['LB_CLIENTPULLPORT']))
 
         self.healthSock = self.context.socket(zmq.REP)
         self.healthSock.bind("tcp://"+self.CONSTANTS['LB_IP']+":" + str(self.CONSTANTS['LB_HCREPPORT']))
@@ -115,81 +167,48 @@ class LoadBalancer:
         self.poller = zmq.Poller()
         self.poller.register(self.workerStateSock, zmq.POLLIN)
         self.poller.register(self.healthSock, zmq.POLLIN)
-        self.poller.register(self.clientPullSock, zmq.POLLIN)
+        self.poller.register(self.clientSock, zmq.POLLIN)
 
-    def resetWorkerSocket(self,workerid):
-        self.workers[workerid]['workersocket'].setsockopt(zmq.RCVTIMEO, self.CONSTANTS['SOCKET_TIMEOUT'])  # Time out when asking worker
-        self.workers[workerid]['workersocket'].setsockopt(zmq.SNDTIMEO, self.CONSTANTS['SOCKET_TIMEOUT'])
-        self.workers[workerid]['workersocket'].setsockopt(zmq.LINGER, 0)  # Time before closing socket
-        self.workers[workerid]['workersocket'].setsockopt(zmq.REQ_RELAXED, 1)
-        self.workers[workerid]['workersocket'].connect('tcp://' + self.workers[workerid]['workerip'] + ':' + str(self.workers[workerid]['workerport']))
 
     def addWorker(self, workerinfo):
-        workerid = workerinfo['workerid']
-        self.workers[workerid] = workerinfo
-        self.workers[workerid]['workerstate'] = 0
-        self.workers[workerid]['workercpustate'] = 100
-        self.workers[workerid]['lasttasktime'] = time.time()
-        self.workers[workerid]['learningCommand']  = None
-        self.workers[workerid]['learningParam'] = None
-        self.workers[workerid]['workersocket'] = self.context.socket(zmq.REQ)
-        self.resetWorkerSocket(workerid)
-
-    def askWorkerReady(self,workerid):
-        try:
-            self.workers[workerid]['lasttasktime'] = time.time()
-            self.workers[workerid]['workersocket'].send_json({'TASK': 'READY?'})
-            if self.workers[workerid]['workersocket'].recv_json() == {'WK':'OK'}:
-                self.workers[workerid]['workerstate'] = 100
-            else:
-                self.workers[workerid]['workerstate'] = 0
-
-        except Exception as e:
-            del self.workers[workerid]
-            cprint('LB - REMOVING WORKER %s - NO ANSWER TO READY QUESTION : %s' % (workerid, str(e)),'FAIL')
-            pass
-
+        self.workers[workerinfo['workerid']] = LBWorker(workerinfo)
 
     def sendTasks(self):
 
         for workerid in self.sortedworkersid:
             if self.workers[workerid]['workerstate'] >= 100: #there is at least a free worker
 
-                for nqueue, queue in enumerate(self.queues):
-                    if queue.tasks:
-                        if (queue.highP and (self.workers[workerid]['workerpriority'] == 0)) or (queue.lowP and (self.workers[workerid]['workerpriority'] == 10)):
-                            try:
-                                self.workers[workerid]['workerstate'] = 0
-                                taskmsg = queue.tasks[0]
-                                self.workers[workerid]['workersocket'].send_json(taskmsg)
-                                answer = self.workers[workerid]['workersocket'].recv_json()
-                                if answer == {'WK':'OK'}:
-                                    waitingtime = time.time() - queue.tasksSubmissionTimes[0]
-                                    queue.maxWaitTime = max(queue.maxWaitTime,  waitingtime)
-                                    queue.meanWaitTime = (queue.meanWaitTime * queue.tasksDone + waitingtime)/ (queue.tasksDone + 1)
-                                    queue.tasksDone += 1
-                                    queue.tasks.pop(0)
-                                    queue.tasksSubmissionTimes.pop(0)
-                                    queue.tasksEstCalculTimes.pop(0)
+                for i,task in enumerate(self.queue.tasks):
+                    if (task.priority >= self.workers[workerid].workerinfo['minpriority']) and (task.priority <= self.workers[workerid].workerinfo['maxpriority']):
+                        try:
+                            self.workers[workerid]['workerstate'] = 0
 
-                                    self.workers[workerid]['lasttasktime'] = time.time()
-                                    self.workers[workerid]['learningCommand'] = taskmsg['TASK']
-                                    self.workers[workerid]['learningParam'] = taskmsg['learningParam']
-                                else:
-                                    cprint('LB - WORKER %s DID NOT TAKE TASK - stay in queue' % workerid, 'WARNING')
+                            self.workers[workerid]['workersocket'].send_json({'TASK':task.taskdict,'TASKNAME':task.taskname})
+                            answer = self.workers[workerid]['workersocket'].recv_json()
+                            if answer == {'WK':'OK'}:
+                                waitingtime = time.time() - task.submissiontime
 
-                            except Exception as e:
-                                cprint('LB - CAN\'T SEND TASK TO WORKER %s : %s' % (workerid, str(e)), 'FAIL')
-                                self.workers[workerid]['workersocket'].disconnect(
-                                    'tcp://' + self.workers[workerid]['workerip'] + ':' + str(
-                                        self.workers[workerid]['workerport']))
-                                self.resetWorkerSocket(workerid)
-                                pass
+                                self.queue.tasksDone['taskname'] = task.taskname
+                                self.queue.tasksDone['priority'] = task.priority
+                                self.queue.tasksDone['waitingtime'] = waitingtime
 
-                            break
+                                self.pendingtaks[task.taskid] = self.queue.tasks.pop(i)
+                                self.pendingtaks[task.taskid].taskdict = None #remove taskdict in case it is big
 
+                                self.workers[workerid].lasttasktime = time.time()
+                                self.workers[workerid].taskname = task.taskname
+                            else:
+                                cprint('LB - WORKER %s DID NOT TAKE TASK - stay in queue' % workerid, 'WARNING')
 
+                        except Exception as e:
+                            cprint('LB - CAN\'T SEND TASK TO WORKER %s : %s' % (workerid, str(e)), 'FAIL')
+                            self.workers[workerid].workersocket.disconnect(
+                                'tcp://' + self.workers[workerid]['workerip'] + ':' + str(
+                                    self.workers[workerid]['workerport']))
+                            self.workers[workerid].resetWorkerSocket()
+                            pass
 
+                        break
 
 
     def startLB(self):
@@ -203,27 +222,27 @@ class LoadBalancer:
                 msg = self.workerStateSock.recv_json()
                 if 'CPUonly' in msg:
                     if (msg['workerid'] in self.workers):
-                        self.workers[msg['workerid']]['workercpustate'] = msg['workercpustate']
+                        self.workers[msg['workerid']].workercpustate = msg['workercpustate']
                 elif (msg['workerstate'] == "HELLO"):
                     if (msg['workerid'] not in self.workers):
                         cprint("LB - RECEIVED HELLO MESSAGE FROM AN UNKWONN WORKER (%s). ADDING WORKER" % msg['workerid'], 'OKBLUE')
                         self.addWorker(msg)
-                        self.askWorkerReady(msg['workerid'])
+                        self.workers[msg['workerid']].refreshState()
                 else:
                     if (msg['workerid'] in self.workers):
-                        self.workers[msg['workerid']]['workerstate'] = msg['workerstate']
-                        if (msg['workerstate'] == 100) and (self.workers[msg['workerid']]['learningParam'] != None):
-                            command = self.workers[msg['workerid']]['learningCommand']
-                            learningparam = self.workers[msg['workerid']]['learningParam']
-                            timetocomplete = time.time() - self.workers[msg['workerid']]['lasttasktime']
-                            if command not in self.learnTimes:
-                                self.learnTimes[command] = learnTaskTimes(command)
-                            self.learnTimes[command].addObservation(learningparam,timetocomplete)
-                            self.workers[msg['workerid']]['learningCommand'] = None
-                            self.workers[msg['workerid']]['learningParam'] = None
+                        self.workers[msg['workerid']].workerstate = msg['workerstate']
+                        if msg['taskid'] in self.pendingtasks :
+                            self.pendingtasks[msg['taskid']].progress = msg['workerstate']
 
-                            guess = self.learnTimes[command].guessTime(learningparam)
-                            print('REAL TIME ', timetocomplete, ' - ESTIMATED TIME ', guess, ' - ', (guess-timetocomplete)/timetocomplete*100, ' % err')
+                        if (msg['workerstate'] == 100) and (self.workers[msg['workerid']].taskname != None):
+                            print('TASK',msg['taskid'],'DONE')
+                            timetocomplete = time.time() - self.workers[msg['workerid']].lasttasktime
+                            self.donetasks[msg['taskid']] = self.pendingtasks.pop(msg['taskid'])
+                            self.donetasks[msg['taskid']].timetocomplete = time.time() - self.workers[msg['workerid']].lasttasktime
+                            self.donetasks[msg['taskid']].workerresult = msg['workerresult']
+                            self.donetasks[msg['taskid']].resulttime = time.time()
+                            self.donetasks[msg['taskid']].deletetime = time.time() + 10*60 #result delete ten minutes
+                            self.workers.taskname = None
 
 
 
@@ -234,15 +253,15 @@ class LoadBalancer:
                 ### MESSAGE COMING FROM HEALTH CHECK ###
                 if 'HEALTH' in msg:
                     if msg['HEALTH'] == 'GIVEMEWORKERSLIST':
-                        self.healthSock.send_json({workerid: {'workerip': self.workers[workerid]['workerip'],
-                                                            'workerhealthport': self.workers[workerid]['workerhealthport'],
-                                                            'lasttasktime': self.workers[workerid]['lasttasktime']} for
+                        self.healthSock.send_json({workerid: {'workerip': self.workers[workerid].workerinfo['workerip'],
+                                                            'workerhealthport': self.workers[workerid].workerinfo['workerhealthport'],
+                                                            'lasttasktime': self.workers[workerid].lasttasktime} for
                                                  workerid in self.workers})
                     elif msg['HEALTH'] == 'DOWNWORKER':
                         self.healthSock.send_json({'LB':'OK'})
                         if msg['workerid'] in self.workers:
                             cprint('LB - Worker %s is DOWN. Removing it'%msg['workerid'], 'FAIL')
-                            del self.workers[msg['workerid']]
+                            self.workers.pop([msg['workerid']])
                     else:
                         self.healthSock.send_json({'LB':'ERROR'})
 
@@ -250,53 +269,34 @@ class LoadBalancer:
                 if 'MONITOR' in msg:
                     if msg['MONITOR'] == 'WORKERS':
                         response = {}
-                        response['workers'] = [{'workerid':workerid, 'workerip':self.workers[workerid]['workerip'], 'workerport':self.workers[workerid]['workerport'], 'workerhealthport':self.workers[workerid]['workerhealthport'], 'workerCPU':self.workers[workerid]['workercpustate'], 'workertask':self.workers[workerid]['learningCommand'], 'workerdone':self.workers[workerid]['workerstate'], 'workerpriority':self.workers[workerid]['workerpriority']} for workerid in self.workers]
-                        response['queues'] = []
+                        response['workers'] = [{'workerid':workerid, 'workerip':self.workers[workerid].workerinfo['workerip'], 'workerport':self.workers[workerid].workerinfo['workerport'], 'workerhealthport':self.workers[workerid].workerinfo['workerhealthport'], 'workerCPU':self.workers[workerid].workercpustate, 'workertask':self.workers[workerid].taskname, 'workerdone':self.workers[workerid].workerstate, 'workerminpriority':self.workers[workerid].workerinfo['minpriority'], 'workermaxpriority':self.workers[workerid].workerinfo['maxpriority']} for workerid in self.workers]
 
-                        queuestotaltimes = 0
-                        for nqueue, queue in enumerate(self.queues):
-                            response['queues'].append("Queue" + str(nqueue))
-                            queueavailableworkers = sum( [ ((queue.highP and (self.workers[workerid]['workerpriority'] == 0)) or (queue.lowP and (self.workers[workerid]['workerpriority'] == 10))) for workerid in self.workers])
+                        response['queue'] = {}
+                        response['pending'] = {}
+                        response['done'] = {}
 
-                            response["Queue" + str(nqueue)] = {  'meantime': queue.meanWaitTime,
-                                                                 'maxtime' : queue.maxWaitTime,
-                                                                 'donetasks' : queue.tasksDone,
-                                                                 'availworkers': queueavailableworkers,
-                                                                 'highP': queue.highP,
-                                                                 'lowP': queue.lowP}
-                            if queue.tasks:
-                                queuestotaltimes += sum(queue.tasksEstCalculTimes)/queueavailableworkers
-                                response["Queue" + str(nqueue)]['queuetime'] = time.time() - queue.tasksSubmissionTimes[0]
-                                response["Queue" + str(nqueue)]['queuingtasks'] = len(queue.tasks)
+                        for i,task in enumerate(self.queue):
+                            if task.deletetime > time.time():
+                                print('QUEUED TASK',task.taskid,'TOO OLD DELETING')
+                                self.queue.pop(i)
                             else:
-                                response["Queue" + str(nqueue)]['queuetime'] = 0
-                                response["Queue" + str(nqueue)]['queuingtasks'] = 0
+                                response['queue'][task.taskid] =  {'name':task.taskname, 'priority':task.priority, 'time': time.time()-task.submissiontime}
 
-                            response["Queue" + str(nqueue)]['totalesttime'] = queuestotaltimes
+                        for taskid in self.pendingtasks:
+                            if self.pendingtasks[taskid].deletetime > time.time():
+                                print('PENDING TASK',taskid,'TOO OLD DELETING')
+                                self.pendingtasks.pop(taskid)
+                            else:
+                                response['pending'][taskid] =  {'name':self.pendingtasks[taskid].taskname, 'priority':self.pendingtasks[taskid].priority, 'time': time.time()-self.pendingtasks[taskid].submissiontime, 'progress':self.pendingtasks[taskid].progress}
+
+                        for taskid in self.donetasks:
+                            if self.donetasks[taskid].deletetime > time.time():
+                                print('DONE TASK',taskid,'TOO OLD DELETING')
+                                self.donetasks.pop(taskid)
+                            else:
+                                response['done'][taskid] =  {'name':self.donetasks[taskid].taskname, 'priority':self.donetasks[taskid].priority, 'time': time.time()-self.donetasks[taskid].resulttime}
 
                         print(response)
-                        self.healthSock.send_json(response)
-                    elif msg['MONITOR'] == 'COMMANDS':
-                        response = [command for command in  self.learnTimes]
-                        self.healthSock.send_json(response)
-
-                    elif msg['MONITOR'] == 'COMMAND':
-                        if 'name' in msg:
-                            command = msg['name']
-                            if command in self.learnTimes :
-                                print('MONITOR ASKING FOR INFO ', command, msg)
-                                response = {'command': command,
-                                             'timepoints': [{"x": self.learnTimes[command].learnParams[i],
-                                                             "y": self.learnTimes[command].learnTimes[i]} for (i, learnparam) in
-                                                            enumerate(self.learnTimes[command].learnParams)],
-                                             'esttimepoints': [{"x": param, "y": self.learnTimes[command].guessTime(param)} for
-                                                               param in np.linspace(min(self.learnTimes[command].learnParams),
-                                                                                    max(self.learnTimes[command].learnParams),
-                                                                                    50)]}
-                            else:
-                                response = 0
-                        else:
-                            response = 0
                         self.healthSock.send_json(response)
                     else:
                         self.healthSock.send_json(0)
@@ -304,37 +304,57 @@ class LoadBalancer:
 
 
             ###### RECEIVE INFORMATION FROM A CLIENT ############
-            if self.clientPullSock in sockets:
-                msg = self.clientPullSock.recv_json()
-                if msg['HELLO'] == 'TOWORKER':
-                    print('REVEIVED TASK FROM CLIENT', msg['TASK'])
+            if self.clientSock in sockets:
+                msg = self.clientSock.recv_json()
+                if 'toLB' in msg:
+                    if msg['toLB'] == "NEWTASK":
+                        print('REVEIVED NEW TASK FROM CLIENT', msg['taskname'])
+                        try:
+                            taskid = self.queue.addTask(msg['taskname'],msg['taskdict'],msg['taskdict'])
+                            self.clientSock.send_json({'taskid':taskid})
+                        except:
+                            self.clientSock.send_json({"ERROR":"while adding task, please check message syntax"})
+                            print("ERROR while adding task, please check client message syntax")
+                            print(msg)
+                            pass
 
-                    if 'learningParam' not in msg:
-                        msg['learningParam'] = 1
+                    elif msg['toLB'] == "GETTASK":
+                        print('REVEIVED GET TASK FROM CLIENT', msg['taskid'])
+                        if msg['taskid'] in self.donetasks:
+                            self.clientSock.send_json({'progress':100,'result':self.donetasks[msg['taskid']].workerresult})
+                            self.donetasks[msg['taskid']].deletetime = time.time() + 60 #Delete result 1min after client query (allow query again in short time)
+                        elif msg['taskid'] in self.pendingtasks:
+                            self.clientSock.send_json({'progress':self.pendingtasks[msg['taskid']].progress,'result':None})
+                        else:
+                            self.clientSock.send_json({'progress':0,'result':None})
 
-                    if msg['TASK'] in self.learnTimes:
-                        estimatedtime =  self.learnTimes[msg['TASK']].guessTime(msg['learningParam'])
-                        cprint('LB - TASK %s WITH PARAM %f WILL TAKE ABOUT %f sec ' % (msg['TASK'],msg['learningParam'],estimatedtime),'OKBLUE')
+                    elif msg['toLB'] == "CANCELTASK":
+                        cancelstatus = {'deleted':True,'from':'done'}
+                        print('REVEIVED CANCEL TASK FROM CLIENT', msg['taskid'])
+                        if msg['taskid'] in self.donetasks:
+                            self.donetasks.pop(msg['taskid'])
+                            cancelstatus = {'deleted':True,'from':'done'}
+                        elif msg['taskid'] in self.pendingtasks:
+                            cancelstatus = {'deleted':False,'from':'pending'}
+                        else:
+                            for i,task in enumerate(self.queue):
+                                if task.taskid == msg['taskid']:
+                                    self.queue.pop(i)
+                                    cancelstatus = {'deleted':True,'from':'queue'}
+                                    break
+                        self.clientSock.send_json(cancelstatus)
+
                     else:
-                        estimatedtime = self.queues[-1].maxAllowedTime
-                        cprint('LB - TASK %s HAS NO ESTIMATED TIME, time set to %ss'%estimatedtime, 'OKBLUE')
+                        self.clientSock.send('ERROR Unknown toLB command')
 
-                    nqueue = 0
-                    for nqueue,queue in enumerate(self.queues):
-                        if (estimatedtime < queue.maxAllowedTime) or (nqueue == len(self.queues) - 1): ##go to the first queue that have a superior max time or to the last
-                            queue.tasks.append(msg)
-                            queue.tasksSubmissionTimes.append(time.time())
-                            queue.tasksEstCalculTimes.append(estimatedtime)
-                            break
+                else:
+                    self.clientSock.send('ERROR, message from Client not toLB')
 
 
             ###### DISLPAY STATS ############
-            states = [self.workers[workerid]['workerstate'] for workerid in self.workers]
-            cpustates = [self.workers[workerid]['workercpustate'] for workerid in self.workers]
+            states = [self.workers[workerid].workerstate for workerid in self.workers]
             self.availworkers = len([s for s in states if s >= 100])
-            self.sortedworkersid = sorted(self.workers, key=lambda x: (-self.workers[x]['workerstate'], self.workers[x][
-                'workercpustate']))  # sort the workers by decreasing state then increasing cpu
-
+            self.sortedworkersid = sorted(self.workers, key=lambda x: (-self.workers[x].workerstate, self.workers[x].workercpustate))  # sort the workers by decreasing state then increasing cpu
 
             ###### DO TASKS ############
             self.sendTasks()
