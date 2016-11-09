@@ -21,6 +21,7 @@ import json
 import argparse
 from .colorprint import cprint,bcolors
 import sys
+import traceback
 
 __all__ = ['HealthCheck'] #Only possible to import Client
 
@@ -86,11 +87,14 @@ class HealthCheck:
                 self.dealer.recv()
                 response = self.dealer.recv_json()
                 if not 'workerid' in response:
-                    cprint('HC - GOT RESPONSE FROM AN UNKNOWN WORKER', 'FAIL')
+                    if response != {'WK':'FLUSHED'}:
+                        cprint('HC - GOT RESPONSE FROM AN UNKNOWN WORKER', 'FAIL')
                 if response['workerid'] in self.workers:
                     self.workers[response['workerid']]['workerstate'] = response['workerstate']
 
             except Exception as e:
+                #cprint('    WORKER DID NOT ANSWER', 'FAIL')
+                #traceback.print_exc()
                 failed += 1
                 pass
 
@@ -167,4 +171,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

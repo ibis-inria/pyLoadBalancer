@@ -16,12 +16,12 @@ Then create the tasks you want to send. A task is a dict that must contains a ke
 You can then organize your task dict as you want, as long as the Workers are programmed to be able to understand it.
 When the task is to be sent, send it using :
 
-    taskID = CL.sendTask(taskdict)
+    taskid = CL.sendTask(taskdict)
 
 Where taskdict is a python dict describing the task to be done by the worker.
-taskID is th ID of the task unique ID returned by the Load Balancer. The task can be retrieved from the Load Balancer using the following syntax :
+taskid is th ID of the task unique ID returned by the Load Balancer. The task can be retrieved from the Load Balancer using the following syntax :
 
-    taskresult = CL.getTask(taskID)
+    taskresult = CL.getTask(taskid)
 
 If the task is done, taskresult will contain the result dict returned by the Worker.
 If the task is not done, taskresult will be -1 or the completion percentage (if available)
@@ -30,6 +30,8 @@ If the task is not done, taskresult will be -1 or the completion percentage (if 
 import zmq
 import os.path
 import json
+import time
+import traceback
 
 __all__ = ['Client'] #Only possible to import Client
 
@@ -38,17 +40,64 @@ class Client:
         with open(os.path.join(os.path.dirname(__file__), 'parameters.json'), 'r') as fp:
             self.CONSTANTS = json.load(fp)
         self.context = zmq.Context()
-        self.pushSock = self.context.socket(zmq.REQ)
+
+    def openSock(self):
+        pushSock = self.context.socket(zmq.REQ)
+        pushSock.setsockopt(zmq.RCVTIMEO, self.CONSTANTS['SOCKET_TIMEOUT'])  # Time out when asking worker
+        pushSock.setsockopt(zmq.SNDTIMEO, self.CONSTANTS['SOCKET_TIMEOUT'])
+        pushSock.setsockopt(zmq.LINGER, 0)  # Time before closing socket
+        pushSock.setsockopt(zmq.REQ_RELAXED,1)
+        pushSock.connect('tcp://'+self.CONSTANTS['LB_IP']+':'+str(self.CONSTANTS['LB_CLIENTPULLPORT']))
+        return pushSock
+
+    def resetSocket(pushSock):
+        self.pushSock.setsockopt(zmq.RCVTIMEO, self.CONSTANTS['LB_IP'])  # Time out when asking worker
+        self.pushSock.setsockopt(zmq.SNDTIMEO, self.CONSTANTS['LB_IP'])
+        self.pushSock.setsockopt(zmq.LINGER, 0)  # Time before closing socket
+        self.pushSock.setsockopt(zmq.REQ_RELAXED, 1)
         self.pushSock.connect('tcp://'+self.CONSTANTS['LB_IP']+':'+str(self.CONSTANTS['LB_CLIENTPULLPORT']))
 
-    def sendTask(self,taskdict,LBinfo=None):
+    def sendTask(self,taskname,taskdict,LBinfo=None):
         task = {'toLB' : 'NEWTASK', 'LBinfo':LBinfo, 'taskdict' : taskdict, 'taskname' : taskname}
-        return self.pushSock.send_json(task)
+        for i in range(3):
+            try:
+                pushSock = self.openSock()
+                pushSock.send_json(task)
+                result = pushSock.recv_json()
+                pushSock.close()
+                return result
+            except:
+                print("ERROR WHILE SENDING/RECEIVING SOCKET")
+                traceback.print_exc()
+                try:
+                    pushSock.close()
+                except:
+                    pass
+                time.sleep(0.1)
+                pass
 
-    def getTask(self,taskID):
-        task = {'toLB' : 'GETTASK', 'taskID':taskID}
-        return self.pushSock.send_json(task)
+            return {'LB':'ERROR'}
 
-    def cancelTask(self,taskID):
-        task = {'toLB' : 'CANCELTASK', 'taskID':taskID}
-        return self.pushSock.send_json(task)
+    def getTask(self,taskid):
+        task = {'toLB' : 'GETTASK', 'taskid':taskid}
+        pushSock = self.openSock()
+        try:
+            pushSock.send_json(task)
+            result = pushSock.recv_json()
+            pushSock.close()
+            return result
+        except:
+            print("ERROR WHILE SENDING/RECEIVING SOCKET")
+            traceback.print_exc()
+            try:
+                pushSock.close()
+            except:
+                pass
+            time.sleep(0.1)
+            pass
+
+
+    def cancelTask(self,taskid):
+        task = {'toLB' : 'CANCELTASK', 'taskid':taskid}
+        self.pushSock.send_json(task)
+        return self.pushSock.recv_json()

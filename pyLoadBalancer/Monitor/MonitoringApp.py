@@ -25,6 +25,7 @@ def setLBReqSock(LBReqSock):
     LBReqSock.setsockopt(zmq.RCVTIMEO, SOCKET_TIMEOUT)  # Time out when asking worker
     LBReqSock.setsockopt(zmq.SNDTIMEO, SOCKET_TIMEOUT)
     LBReqSock.setsockopt(zmq.REQ_RELAXED, 1)
+    LBReqSock.setsockopt(zmq.LINGER, 0)  # Time before closing socket
     LBReqSock.connect(LB_HEALTHADRESS)
     print('MONITOR - Conected to ', LB_HEALTHADRESS)
 
@@ -83,7 +84,7 @@ def main():
 
     parser = argparse.ArgumentParser(description='Monitor Server Script for the pyLoadBalancer module.')
     parser.add_argument('-p', '--pfile', default=None, help='parameter file, in JSON format')
-    parser.add_argument('-port', '--port', default=8000, help='web server port')
+    parser.add_argument('-port', '--port', default=9000, help='web server port')
     parser.add_argument('-a', '--adress', default='127.0.0.1', help='web server ip adress')
     args = parser.parse_args()
     with open(os.path.join(os.path.dirname(__file__), '../parameters.json'), 'r') as fp:
@@ -110,4 +111,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
