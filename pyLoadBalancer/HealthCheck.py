@@ -157,7 +157,7 @@ class HealthCheck:
         #    else:
         #        cprint("HC - %s - %d available workers" %(time.strftime('%H:%M:%S'),availworkers),'OKGREEN')
 
-    def startHC(self, checkTimer=2):
+    def startHC(self, checkTimer=1):
         while True:
             self.doHealthCheckTasks()
             time.sleep(checkTimer)

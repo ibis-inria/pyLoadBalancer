@@ -69,6 +69,7 @@ class LBWorker:
         self.workercpustate = 100
         self.lasttasktime = time.time()
         self.taskname  = None
+        self.taskid  = None
         self.workersocket = zmqcontext.socket(zmq.REQ)
         self.SOCKET_TIMEOUT = sockettimeout
         self.resetWorkerSocket()
@@ -201,6 +202,8 @@ class LoadBalancer:
 
                                 self.workers[workerid].lasttasktime = time.time()
                                 self.workers[workerid].taskname = task.taskname
+                                self.workers[workerid].taskid = task.taskid
+
                             elif answer == {'WK':'UNKNOWN'}:
                                 cprint('LB - WORKER %s DOES NOT UNDERSAND TASK %s. REMOVING TASK' % (workerid,task.taskname), 'WARNING')
                                 self.queue.tasks.pop(i)
@@ -255,6 +258,7 @@ class LoadBalancer:
                                     self.donetasks[msg['taskid']].deletetime = time.time() + 10*60 #result delete ten minutes
                                     ##self.queue.taskshistory[msg['taskid']]['timetocomplete'] = self.donetasks[msg['taskid']].timetocomplete
                                     self.workers[msg['workerid']].taskname = None
+                                    self.workers[msg['workerid']].taskid = None
 
 
                                     taskname = self.donetasks[msg['taskid']].taskname
@@ -300,20 +304,29 @@ class LoadBalancer:
                     if 'MONITOR' in msg:
                         if msg['MONITOR'] == 'WORKERS':
                             response = {}
-                            response['workers'] = [{'workerid':workerid, 'workerip':self.workers[workerid].workerinfo['workerip'], 'workerport':self.workers[workerid].workerinfo['workerport'], 'workerhealthport':self.workers[workerid].workerinfo['workerhealthport'], 'workerCPU':self.workers[workerid].workercpustate, 'workertask':self.workers[workerid].taskname, 'workerdone':self.workers[workerid].workerstate, 'workerminpriority':self.workers[workerid].workerinfo['minpriority'], 'workermaxpriority':self.workers[workerid].workerinfo['maxpriority']} for workerid in self.workers]
+                            response['workers'] = [{'workerid':workerid, 'workerip':self.workers[workerid].workerinfo['workerip'], 'workerport':self.workers[workerid].workerinfo['workerport'], 'workerhealthport':self.workers[workerid].workerinfo['workerhealthport'], 'workerCPU':self.workers[workerid].workercpustate, 'workertask':self.workers[workerid].taskname, 'workertaskid':self.workers[workerid].taskid, 'workerdone':self.workers[workerid].workerstate, 'workerminpriority':self.workers[workerid].workerinfo['minpriority'], 'workermaxpriority':self.workers[workerid].workerinfo['maxpriority']} for workerid in self.workers]
 
-                            response['queue'] = {}
-                            response['pending'] = {}
-                            response['done'] = {}
+                            response['commandqueue'] = {}
+                            response['priorityqueue'] = {}
 
                             for i,task in enumerate(self.queue.tasks):
-                                response['queue'][task.taskid] =  {'name':task.taskname, 'priority':task.priority, 'time': time.time()-task.submissiontime}
+                                if task.taskname not in response['commandqueue']:
+                                    response['commandqueue'][task.taskname] = {'number':0,'waitingtime':0}
+                                response['commandqueue'][task.taskname]['number'] += 1
+                                response['commandqueue'][task.taskname]['waitingtime'] += max(time.time()-task.submissiontime,response['commandqueue'][task.taskname]['waitingtime'])
 
-                            for taskid in self.pendingtasks:
-                                response['pending'][taskid] =  {'name':self.pendingtasks[taskid].taskname, 'priority':self.pendingtasks[taskid].priority, 'time': time.time()-self.pendingtasks[taskid].submissiontime, 'progress':self.pendingtasks[taskid].progress}
+                                if task.priority not in response['priorityqueue']:
+                                    response['priorityqueue'][task.priority] = 0
+                                response['priorityqueue'][task.priority] += 1
 
-                            for taskid in self.donetasks:
-                                response['done'][taskid] =  {'name':self.donetasks[taskid].taskname, 'priority':self.donetasks[taskid].priority, 'time': time.time()-self.donetasks[taskid].resulttime}
+                            #for i,task in enumerate(self.queue.tasks):
+                            #    response['queue'].append({'name':task.taskname, 'priority':task.priority, 'time': time.time()-task.submissiontime})
+
+                            #for taskid in self.pendingtasks:
+                            #    response['pending'].append({'name':self.pendingtasks[taskid].taskname, 'priority':self.pendingtasks[taskid].priority, 'time': time.time()-self.pendingtasks[taskid].submissiontime, 'progress':self.pendingtasks[taskid].progress})
+
+                            #for taskid in self.donetasks:
+                            #    response['done'].append({'name':self.donetasks[taskid].taskname, 'priority':self.donetasks[taskid].priority, 'time': time.time()-self.donetasks[taskid].resulttime})
 
                             self.healthSock.send_json(response)
                         elif msg['MONITOR'] == 'STATS':

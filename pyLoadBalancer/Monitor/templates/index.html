@@ -5,15 +5,16 @@
   <meta charset="utf-8">
   <title>LoadBalancer Monitor</title>
 
-  <link rel="stylesheet" href="/static/css/jquery-ui.min.css">
-  <link rel="stylesheet" type="text/css" href="/static/css/semantic.min.css">
+  <link rel="stylesheet" href="static/css/jquery-ui.min.css">
+  <link rel="stylesheet" type="text/css" href="static/css/semantic.min.css">
 
-  <script src="/static/js/jquery-3.1.0.min.js"></script>
-  <script src="/static/js/semantic.min.js"></script>
-  <script src="/static/js/Chart.min.js" type="text/javascript"></script>
+  <script src="static/js/jquery-3.1.0.min.js"></script>
+  <script src="static/js/semantic.min.js"></script>
+  <script src="static/js/Chart.min.js" type="text/javascript"></script>
 
-  <script src="/static/js/useful.js" type="text/javascript"></script>
-  <script src="/static/js/stats_controller.js" type="text/javascript"></script>
+  <script src="static/js/useful.js" type="text/javascript"></script>
+  <script src="static/js/stats_controller.js" type="text/javascript"></script>
+  <script src="static/js/workers_controller.js" type="text/javascript"></script>
 
   <style>
     .legendblock {
@@ -23,11 +24,55 @@
       vertical-align:middle;
       margin:0.1rem 1rem;
     }
+
+    #workerstable th{
+      padding:1rem;
+      background-color: rgba(55,126,184,0.3);
+    }
+
+    #workerstable td{
+      padding: 0.5rem 1rem;
+    }
+
+    .progresscontainer {
+      border: 1px solid rgba(0,0,0,0.2);
+    }
   </style>
 </head>
 
 <body style="margin:1rem; text-align:center;">
   <div class="ui center aligned large header">Load Balancer Monitor</div>
+
+    <div class="ui medium header">Live workers information</div>
+
+    <div class="ui center aligned segment" style="display:inline-block; vertical-align:top; padding:0">
+      <table id="workerstable" align="center" width="100%; padding:1rem;">
+          <tr>
+              <th>Worker name</th>
+              <th>Current task</th>
+              <th>% Done</th>
+              <th>% CPU</th>
+              <th>Task id</th>
+              <th>IP</th>
+              <th>LB Port</th>
+              <th>HC Port</th>
+              <th>Min priority</th>
+              <th>Max priority</th>
+          </tr>
+      </table>
+    </div>
+
+    <div class="ui medium header">Live queue information</div>
+
+    <div class="ui center aligned padded segment" style="display:inline-block; vertical-align:top">
+      <div class="ui center aligned small header">
+        Tasks currently in Queue
+      </div>
+      <canvas id="chartqueuecommand"></canvas>
+    </div>
+
+
+
 
 
 
@@ -79,13 +124,11 @@
     </div>
 
 
-  <div class="ui medium header">Live queue information</div>
-
-  <div class="ui medium header">Live workers information</div>
 
 
   <script>
   $( document ).ready(function(){
+    refreshWorkers();
     refreshStats();
     /*setInterval(function(){
       refreshStats();
