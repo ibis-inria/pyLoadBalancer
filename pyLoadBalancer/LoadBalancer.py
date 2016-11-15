@@ -174,6 +174,8 @@ class LoadBalancer:
         self.lastdisplay = time.time()
         self.lastresultdelete = time.time()
 
+        self.stats = {}
+
     def addWorker(self, workerinfo):
         self.workers[workerinfo['workerid']] = LBWorker(workerinfo,self.context, self.CONSTANTS['SOCKET_TIMEOUT'])
 
@@ -192,7 +194,7 @@ class LoadBalancer:
                             if answer == {'WK':'OK'}:
                                 waitingtime = time.time() - task.submissiontime
 
-                                self.queue.taskshistory[task.taskid]['waitingtime'] = waitingtime
+                                #self.queue.taskshistory[task.taskid]['waitingtime'] = waitingtime
 
                                 self.pendingtasks[task.taskid] = self.queue.tasks.pop(i)
                                 self.pendingtasks[task.taskid].taskdict = None #remove taskdict in case it is big
@@ -251,9 +253,28 @@ class LoadBalancer:
                                     self.donetasks[msg['taskid']].workerresult = msg['workerresult']
                                     self.donetasks[msg['taskid']].resulttime = time.time()
                                     self.donetasks[msg['taskid']].deletetime = time.time() + 10*60 #result delete ten minutes
-                                    self.queue.taskshistory[msg['taskid']]['timetocomplete'] = self.donetasks[msg['taskid']].timetocomplete
+                                    ##self.queue.taskshistory[msg['taskid']]['timetocomplete'] = self.donetasks[msg['taskid']].timetocomplete
                                     self.workers[msg['workerid']].taskname = None
 
+
+                                    taskname = self.donetasks[msg['taskid']].taskname
+                                    waitingtime = self.workers[msg['workerid']].lasttasktime - self.donetasks[msg['taskid']].submissiontime
+                                    if taskname not in self.stats:
+                                        self.stats[taskname] = {"totaltasks" : 0, "totalcalctimes" : 0,
+                                                     "mincalctimes" : 1e10, "meancalctimes" : 0, "maxcalctimes" : 0,
+                                                     "minwaittimes" : 1e10, "meanwaittimes" : 0, "maxwaittimes" : 0}
+
+                                    self.stats[taskname]["totaltasks"] += 1
+                                    self.stats[taskname]["totalcalctimes"] += self.donetasks[msg['taskid']].timetocomplete
+                                    self.stats[taskname]["mincalctimes"] = min(self.stats[taskname]["mincalctimes"],self.donetasks[msg['taskid']].timetocomplete)
+                                    self.stats[taskname]["maxcalctimes"] = max(self.stats[taskname]["maxcalctimes"],self.donetasks[msg['taskid']].timetocomplete)
+                                    self.stats[taskname]["meancalctimes"] = ( (self.stats[taskname]["totaltasks"]-1) * self.stats[taskname]["meancalctimes"] + self.donetasks[msg['taskid']].timetocomplete) / self.stats[taskname]["totaltasks"]
+                                    self.stats[taskname]["minwaittimes"] = min(self.stats[taskname]["minwaittimes"],waitingtime)
+                                    self.stats[taskname]["maxwaittimes"] = max(self.stats[taskname]["maxwaittimes"],waitingtime)
+                                    self.stats[taskname]["meanwaittimes"] = ( (self.stats[taskname]["totaltasks"]-1) * self.stats[taskname]["meanwaittimes"] + waitingtime) / self.stats[taskname]["totaltasks"]
+
+                                    #print("DONE",msg['taskid'])
+                                    #print(self.stats[taskname])
 
 
                 ###### RECEIVE INFORMATION FROM HEALTH CHECK or MONITOR############
@@ -294,8 +315,9 @@ class LoadBalancer:
                             for taskid in self.donetasks:
                                 response['done'][taskid] =  {'name':self.donetasks[taskid].taskname, 'priority':self.donetasks[taskid].priority, 'time': time.time()-self.donetasks[taskid].resulttime}
 
-                            print(response)
                             self.healthSock.send_json(response)
+                        elif msg['MONITOR'] == 'STATS':
+                            self.healthSock.send_json(self.stats)
                         else:
                             self.healthSock.send_json(0)
 
@@ -365,19 +387,17 @@ class LoadBalancer:
                 self.sortedworkersid = sorted(self.workers, key=lambda x: (-self.workers[x].workerstate, self.workers[x].workercpustate))  # sort the workers by decreasing state then increasing cpu
 
                 ###### DISLPAY STATS ############
-                if (time.time() - self.lastdisplay) > 1:
+                '''if (time.time() - self.lastdisplay) > 1:
                     self.lastdisplay = time.time()
                     #states = [self.workers[workerid].workerstate for workerid in self.workers]
                     #self.availworkers = len([s for s in states if s >= 100])
-                    print('#################')
-                    print('QUEUED', len(self.queue.tasks))
-                    print('PENDING', len(self.pendingtasks))
-                    #print(self.pendingtasks)
-                    print('DONE', len(self.donetasks))
-                    #print(self.donetasks)
+                    #print('#################')
+                    #print('QUEUED', len(self.queue.tasks))
+                    #print('PENDING', len(self.pendingtasks))
+                    #print('DONE', len(self.donetasks))
                     #for workerid in self.sortedworkersid:
                     #   print(workerid, self.workers[workerid].workerstate, self.workers[workerid].workercpustate)
-
+                '''
                 ###### REMOVE OLD RESULTS ######
                 if (time.time() - self.lastresultdelete) > 1:
                     self.lastresultdelete = time.time()
@@ -402,7 +422,7 @@ class LoadBalancer:
                         if self.donetasks[taskid].deletetime < time.time():
                             tasktopop.append(taskid)
                     for taskid in reversed(tasktopop):
-                        print('DONE TASK',taskid,'TOO OLD DELETING')
+                        #print('DONE TASK',taskid,'TOO OLD DELETING')
                         self.donetasks.pop(taskid)
 
                 ###### DO TASKS ############

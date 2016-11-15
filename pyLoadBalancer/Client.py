@@ -67,7 +67,7 @@ class Client:
                 pushSock.close()
                 return result
             except:
-                print("ERROR WHILE SENDING/RECEIVING SOCKET")
+                print("sendTask ERROR WHILE SENDING/RECEIVING SOCKET")
                 traceback.print_exc()
                 try:
                     pushSock.close()
@@ -87,7 +87,7 @@ class Client:
             pushSock.close()
             return result
         except:
-            print("ERROR WHILE SENDING/RECEIVING SOCKET")
+            print("getTask ERROR WHILE SENDING/RECEIVING SOCKET")
             traceback.print_exc()
             try:
                 pushSock.close()

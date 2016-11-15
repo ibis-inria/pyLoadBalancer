@@ -187,9 +187,9 @@ class Worker:
 
             if self.LBrepSock in sockets:
                 msg = self.LBrepSock.recv_json()
-                print("WORKER MSG", msg)
+                #print("WORKER MSG", msg)
 
-                print(self.id, " received %r" % msg)
+                #print(self.id, " received %r" % msg)
                 if msg['TASK'] == 'READY?':
                     self.LBrepSock.send_json({'WK':'OK'})
                     self.sendCPUState()
@@ -202,7 +202,7 @@ class Worker:
                 elif msg['TASKNAME'] in self.taskList:
                     self.LBrepSock.send_json({'WK':'OK'})
                     #SENDING TASK TO TASK FUNCTION
-                    print('WORKING ON TASK',msg['taskid'])
+                    #print('WORKING ON TASK',msg['taskid'])
                     taskresult = self.taskList[msg['TASKNAME']]['funct'](task=msg['TASK'],arguments=self.taskList[msg['TASKNAME']]['kwargs'])
 
                     # FINISHED TASK

@@ -10,7 +10,7 @@ The Health Check can be either directly launch from a console :
 
 Or it can be imported as a module :
     from JSONLoadBalancer import HealthCheck
-    HC = HealthCheck(log=True)
+    HC = HealthCheck()
     HC.startHC()
 """
 
@@ -40,7 +40,7 @@ class HealthCheck:
                 cprint('ERROR : %s is not a valid JSON file'%parametersfile, 'FAIL')
                 sys.exit()
 
-        print('pyLoadBalancer')
+        print('pyLoadBalancer - Health Check')
         cprint('Starting Health Check with the folllowing settings : ', 'OKGREEN')
         for keys, values in self.CONSTANTS.items():
             print(bcolors.OKBLUE,'   ', keys, ':',bcolors.ENDC, values)
@@ -98,8 +98,8 @@ class HealthCheck:
                 failed += 1
                 pass
 
-        if failed > 0:
-            cprint('HC - %d WORKERS DID NOT ANSWER' % failed, 'FAIL')
+        #if failed > 0:
+        #    cprint('HC - %d WORKERS DID NOT ANSWER' % failed, 'FAIL')
 
 
         for workerid in self.workers:
@@ -151,13 +151,13 @@ class HealthCheck:
 
         states = [self.workers[workerid]['workerstate'] for workerid in self.workers]
         availworkers = len([s for s in states if s >= 100])
-        if self.workers:
-            if availworkers<1:
-                cprint("HC - %s - no available workers" % (time.strftime('%H:%M:%S')), 'FAIL')
-            else:
-                cprint("HC - %s - %d available workers" %(time.strftime('%H:%M:%S'),availworkers),'OKGREEN')
+        #if self.workers:
+        #    if availworkers<1:
+        #        cprint("HC - %s - no available workers" % (time.strftime('%H:%M:%S')), 'FAIL')
+        #    else:
+        #        cprint("HC - %s - %d available workers" %(time.strftime('%H:%M:%S'),availworkers),'OKGREEN')
 
-    def startHC(self, checkTimer=0.5):
+    def startHC(self, checkTimer=2):
         while True:
             self.doHealthCheckTasks()
             time.sleep(checkTimer)
