@@ -313,7 +313,8 @@ class LoadBalancer:
                                 if task.taskname not in response['commandqueue']:
                                     response['commandqueue'][task.taskname] = {'number':0,'waitingtime':0}
                                 response['commandqueue'][task.taskname]['number'] += 1
-                                response['commandqueue'][task.taskname]['waitingtime'] += max(time.time()-task.submissiontime,response['commandqueue'][task.taskname]['waitingtime'])
+                                print(task.taskname,time.time()-task.submissiontime,response['commandqueue'][task.taskname]['waitingtime'])
+                                response['commandqueue'][task.taskname]['waitingtime'] = max(time.time()-task.submissiontime,response['commandqueue'][task.taskname]['waitingtime'])
 
                                 if task.priority not in response['priorityqueue']:
                                     response['priorityqueue'][task.priority] = 0
@@ -343,8 +344,12 @@ class LoadBalancer:
                         if msg['toLB'] == "NEWTASK":
                             #print('REVEIVED NEW TASK FROM CLIENT', msg['taskname'])
                             try:
-                                if msg['LBinfo'] != None:
-                                    priority = msg['LBinfo']
+                                if ('priority' in msg):
+                                    try:
+                                        priority = float(msg['priority'])
+                                    except:
+                                        priority = 0
+                                        pass
                                 else:
                                     priority = 0
                                 taskid = self.queue.addTask(msg['taskname'],msg['taskdict'],priority)

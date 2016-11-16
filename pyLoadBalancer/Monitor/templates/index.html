@@ -10,6 +10,7 @@
 
   <script src="static/js/jquery-3.1.0.min.js"></script>
   <script src="static/js/semantic.min.js"></script>
+  <script src="static/js/moment.min.js" type="text/javascript"></script>
   <script src="static/js/Chart.min.js" type="text/javascript"></script>
 
   <script src="static/js/useful.js" type="text/javascript"></script>
@@ -66,13 +67,18 @@
 
     <div class="ui center aligned padded segment" style="display:inline-block; vertical-align:top">
       <div class="ui center aligned small header">
-        Tasks currently in Queue
+        Number of queuing tasks
+        <div class="sub header">Total : <span id="totalqueingtasks">-</span></div>
       </div>
       <canvas id="chartqueuecommand"></canvas>
     </div>
-
-
-
+    <div class="ui center aligned padded segment" style="display:inline-block; vertical-align:top">
+      <div class="ui center aligned small header">
+        Waiting time of queuing tasks
+        <div class="sub header">Max : <span id="maxqueingtime">-</span></div>
+      </div>
+      <canvas id="chartqueuetime"></canvas>
+    </div>
 
 
 

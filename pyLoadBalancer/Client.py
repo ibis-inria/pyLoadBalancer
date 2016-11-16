@@ -57,8 +57,8 @@ class Client:
         self.pushSock.setsockopt(zmq.REQ_RELAXED, 1)
         self.pushSock.connect('tcp://'+self.CONSTANTS['LB_IP']+':'+str(self.CONSTANTS['LB_CLIENTPULLPORT']))
 
-    def sendTask(self,taskname,taskdict,LBinfo=None):
-        task = {'toLB' : 'NEWTASK', 'LBinfo':LBinfo, 'taskdict' : taskdict, 'taskname' : taskname}
+    def sendTask(self,taskname,taskdict,priority=0):
+        task = {'toLB' : 'NEWTASK', 'priority':priority, 'taskdict' : taskdict, 'taskname' : taskname}
         for i in range(3):
             try:
                 pushSock = self.openSock()
@@ -73,7 +73,7 @@ class Client:
                     pushSock.close()
                 except:
                     pass
-                time.sleep(0.1)
+                time.sleep(1)
                 pass
 
             return {'LB':'ERROR'}

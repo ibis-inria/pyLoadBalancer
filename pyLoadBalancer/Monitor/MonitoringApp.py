@@ -50,7 +50,7 @@ class Application(tornado.web.Application):
             (r"/jsontoLB/", WorkersHandler)
         ]
         settings = dict(
-            debug=True,
+            autoreload = False,
             template_path=os.path.join(os.path.dirname(__file__), "templates"),
             static_path=os.path.join(os.path.dirname(__file__), "static")
         )
@@ -75,7 +75,7 @@ class WorkersHandler(tornado.web.RequestHandler):
         #print('Response to return')
         #pprint.pprint(response_to_send)
 
-        self.write(json.dumps(response_to_send))
+        self.write(json.dumps(response_to_send)) 
 
 
 def main():
