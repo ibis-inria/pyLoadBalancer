@@ -76,7 +76,7 @@ class Client:
                 time.sleep(1)
                 pass
 
-            return {'LB':'ERROR'}
+        return {'LB':'ERROR'}
 
     def getTask(self,taskid):
         task = {'toLB' : 'GETTASK', 'taskid':taskid}
@@ -93,8 +93,10 @@ class Client:
                 pushSock.close()
             except:
                 pass
-            time.sleep(0.1)
+            time.sleep(0.5)
             pass
+
+        return {'LB':'ERROR'}
 
 
     def cancelTask(self,taskid):
