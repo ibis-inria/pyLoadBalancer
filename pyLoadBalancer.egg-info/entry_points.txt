@@ -1,5 +1,0 @@
-[console_scripts]
-pyLoadBalancer_HC = pyLoadBalancer.HealthCheck:main
-pyLoadBalancer_LB = pyLoadBalancer.LoadBalancer:main
-pyLoadBalancer_Monitor = pyLoadBalancer.Monitor.MonitoringApp:main
-
