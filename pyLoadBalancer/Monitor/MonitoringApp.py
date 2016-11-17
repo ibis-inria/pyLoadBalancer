@@ -14,6 +14,9 @@ import argparse
 import sys
 from tornado.options import define, options
 
+from tornado.wsgi import WSGIAdapter
+import wsgiref.simple_server
+
 context = zmq.Context()
 LB_HEALTHADRESS = None
 LBReqSock = None
@@ -75,7 +78,7 @@ class WorkersHandler(tornado.web.RequestHandler):
         #print('Response to return')
         #pprint.pprint(response_to_send)
 
-        self.write(json.dumps(response_to_send)) 
+        self.write(json.dumps(response_to_send))
 
 
 def main():
@@ -104,8 +107,14 @@ def main():
     setLBReqSock(LBReqSock)
 
     app = Application()
-    app.listen(options.port, address=args.adress)
-    tornado.ioloop.IOLoop.instance().start()
+    WSGI=False
+    if WSGI:
+        wsgi_app = WSGIAdapter(app)
+        server = wsgiref.simple_server.make_server(args.adress, args.port, wsgi_app)
+        server.serve_forever()
+    else:
+        app.listen(options.port, address=args.adress)
+        tornado.ioloop.IOLoop.instance().start()
 
 
 if __name__ == "__main__":

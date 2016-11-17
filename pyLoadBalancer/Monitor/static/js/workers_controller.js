@@ -7,7 +7,7 @@ function refreshWorkers() {
   var dataToSend = JSON.stringify({iwouldlike: "WORKERS",});
   $.ajax(
           {
-              url: '/jsontoLB/',
+              url: window.location.href+'jsontoLB/',
               type: 'POST',
               data: dataToSend,
               contentType: 'application/json',
