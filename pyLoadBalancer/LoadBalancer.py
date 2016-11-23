@@ -155,6 +155,7 @@ class LoadBalancer:
         self.queue = LBQueue()
         self.pendingtasks = {}
         self.donetasks = {}
+        self.cancelledtasks = {}
 
         self.context = zmq.Context()
 
@@ -362,7 +363,9 @@ class LoadBalancer:
 
                         elif msg['toLB'] == "GETTASK":
                             #print('REVEIVED GET TASK FROM CLIENT', msg['taskid'])
-                            if msg['taskid'] in self.donetasks:
+                            if msg['taskid'] in self.cancelledtasks:
+                                self.clientSock.send_json({'progress':'cancelled','result':None})
+                            elif msg['taskid'] in self.donetasks:
                                 self.clientSock.send_json({'progress':100,'result':self.donetasks[msg['taskid']].workerresult})
                                 self.donetasks[msg['taskid']].deletetime = time.time() + 60 #Delete result 1min after client query (allow query again in short time)
                             elif msg['taskid'] in self.pendingtasks:
@@ -382,14 +385,16 @@ class LoadBalancer:
                                 print('REVEIVED CANCEL TASK FROM CLIENT', msg['taskid'])
                                 if msg['taskid'] in self.donetasks:
                                     print('REVEIVED CANCEL TASK FROM CLIENT', msg['taskid'])
-                                    self.donetasks.pop(msg['taskid'])
+                                    self.cancelledtasks[msg['taskid']] = self.donetasks.pop(msg['taskid']);
+                                    self.cancelledtasks[msg['taskid']].deletetime = time.time() + 120
                                     cancelstatus = {'deleted':True,'from':'done'}
                                 elif msg['taskid'] in self.pendingtasks:
                                     cancelstatus = {'deleted':False,'from':'pending'}
                                 else:
                                     for i,task in enumerate(self.queue.tasks):
                                         if task.taskid == msg['taskid']:
-                                            self.queue.tasks.pop(i)
+                                            self.cancelledtasks[msg['taskid']] = self.queue.tasks.pop(i);
+                                            self.cancelledtasks[msg['taskid']].deletetime = time.time() + 120
                                             cancelstatus = {'deleted':True,'from':'queue'}
                                             break
                             self.clientSock.send_json(cancelstatus)
@@ -442,6 +447,14 @@ class LoadBalancer:
                     for taskid in reversed(tasktopop):
                         #print('DONE TASK',taskid,'TOO OLD DELETING')
                         self.donetasks.pop(taskid)
+
+                    tasktopop = []
+                    for taskid in self.cancelledtasks:
+                        if self.cancelledtasks[taskid].deletetime < time.time():
+                            tasktopop.append(taskid)
+                    for taskid in reversed(tasktopop):
+                        print('CANCELLED TASK',taskid,'TOO OLD DELETING')
+                        self.cancelledtasks.pop(taskid)
 
                 ###### DO TASKS ############
                 self.sendTasks()

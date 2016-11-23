@@ -101,5 +101,21 @@ class Client:
 
     def cancelTask(self,taskid):
         task = {'toLB' : 'CANCELTASK', 'taskid':taskid}
-        self.pushSock.send_json(task)
-        return self.pushSock.recv_json()
+        pushSock = self.openSock()
+
+        try:
+            pushSock.send_json(task)
+            result = pushSock.recv_json()
+            pushSock.close()
+            return result
+        except:
+            print("cancelTask ERROR WHILE SENDING/RECEIVING SOCKET")
+            traceback.print_exc()
+            try:
+                pushSock.close()
+            except:
+                pass
+            time.sleep(0.5)
+            pass
+
+        return {'LB':'ERROR'}
