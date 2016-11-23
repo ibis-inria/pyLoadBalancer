@@ -34,6 +34,7 @@ import os.path
 import psutil
 import sys
 from .colorprint import cprint, bcolors
+import multiprocessing
 
 
 
@@ -77,6 +78,12 @@ class Worker:
         self.poller = zmq.Poller()
         self.poller.register(self.LBrepSock, zmq.POLLIN)
         self.poller.register(self.HCrepSock, zmq.POLLIN)
+
+        self.workingprocess = None
+        self.state = 100
+        self.workingon = None
+        self.manager = multiprocessing.Manager()
+        self.taskresult = self.manager.dict()
 
 
     def setProcessPriority(self, priority):
@@ -165,6 +172,8 @@ class Worker:
                 break
             socketstoflush = dict(self.poller.poll(50))
 
+    def processtask(self,taskfunct,resultdict,id,**kwargs):
+        resultdict[id] = taskfunct(**kwargs)
 
     def startWK(self):
         cprint('Starting Worker %s : '%self.id, 'OKGREEN')
@@ -178,40 +187,79 @@ class Worker:
             print(bcolors.OKBLUE,'   ', keys, ':',bcolors.ENDC, values)
 
         while True:
-            self.sayHello()
-            sockets = dict(self.poller.poll(10000))
-            if not sockets:
+            if self.state < 100:
+                if not self.workingprocess.is_alive():
+                    print("WORKER SEEMS TO BE DONE")
+                    self.workingprocess.join(100)
+                    print("RESULT", self.id in self.taskresult)
+                    self.sendState(100,resultmessage=self.taskresult[self.id],taskid=self.workingon)
+                    self.state = 100
+                    self.workingon = None
+                    self.taskresult[self.id] = None
+                sockets = dict(self.poller.poll(100))
+            else:
+                sockets = dict(self.poller.poll(10000))
+
+
+            if (not sockets) and (self.state == 100):
+                self.sayHello()
                 cprint('%s - %s - NOTHING TO DO' % (self.id, time.strftime('%H:%M:%S')), 'OKBLUE')
                 self.sendCPUState()
-                self.sendState(100)
+                self.sendState(self.state)
 
             if self.LBrepSock in sockets:
                 msg = self.LBrepSock.recv_json()
                 #print("WORKER MSG", msg)
 
                 #print(self.id, " received %r" % msg)
-                if msg['TASK'] == 'READY?':
+                if msg['TASK'] == 'CANCEL':
+                    if (self.state < 100) and (self.workingprocess != None) and (self.workingprocess.is_alive()):
+                        self.state = 100
+                        self.LBrepSock.send_json({'WK':'OK'})
+                        try:
+                            self.workingprocess.terminate()
+                        except:
+                            pass
+                        self.workingon = None
+                        self.taskresult[self.id] = None
+                        time.sleep(1)
+                        self.state = 100
+                    else:
+                        self.LBrepSock.send_json({'WK':'ERROR'})
+
+                elif (self.state < 100) and (self.workingprocess != None) and (self.workingprocess.is_alive()):
+                    self.LBrepSock.send_json({'WK':'ERROR'})
+
+                elif msg['TASK'] == 'READY?':
                     self.LBrepSock.send_json({'WK':'OK'})
                     self.sendCPUState()
-                    self.sendState(100)
+                    self.sendState(self.state)
 
                 elif msg['TASK'] == 'EXIT':
                     self.LBrepSock.send_json({'WK':'OK'})
                     break
 
                 elif msg['TASKNAME'] in self.taskList:
+                    print("WORKER RECEIVED TASK")
                     self.LBrepSock.send_json({'WK':'OK'})
                     #SENDING TASK TO TASK FUNCTION
                     #print('WORKING ON TASK',msg['taskid'])
-                    taskresult = self.taskList[msg['TASKNAME']]['funct'](task=msg['TASK'],arguments=self.taskList[msg['TASKNAME']]['kwargs'])
+                    self.taskresult[self.id] = None
+                    self.workingprocess = multiprocessing.Process(target=self.processtask, args=(self.taskList[msg['TASKNAME']]['funct'],self.taskresult, self.id), kwargs={'task':msg['TASK'],'arguments':self.taskList[msg['TASKNAME']]['kwargs']})
+                    self.state = 0
+                    self.workingon = msg['taskid']
+                    print("STARTING PROCESS, RESULT",self.taskresult)
+                    self.workingprocess.start()
+                    print("PROCESS STARTED", self.workingprocess.is_alive())
+                    ##taskresult = self.taskList[msg['TASKNAME']]['funct'](task=msg['TASK'],arguments=self.taskList[msg['TASKNAME']]['kwargs'])
 
                     # FINISHED TASK
                     # FLUSHING SOCKETS received during calculation time
-                    self.flushsockets()
+                    #self.flushsockets()
 
                     #print('TASK FINISHED',msg['taskid'], taskresult)
-                    self.sendCPUState()
-                    self.sendState(100,resultmessage=taskresult,taskid=msg['taskid'])
+                    #self.sendCPUState()
+                    #self.sendState(100,resultmessage=taskresult,taskid=msg['taskid'])
 
 
                 else:
@@ -226,6 +274,6 @@ class Worker:
                     self.HCrepSock.send_json({'workerid': self.id, 'workerstate' : 100})
                 else:
                     self.HCrepSock.send_json({msg['HEALTH']: 'COMMAND UNKNOWN'})
-                self.sendState(100)
+                self.sendState(self.state)
                 self.sendCPUState()
         return

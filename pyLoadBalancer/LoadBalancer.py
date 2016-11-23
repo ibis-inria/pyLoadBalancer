@@ -200,6 +200,7 @@ class LoadBalancer:
 
                                 self.pendingtasks[task.taskid] = self.queue.tasks.pop(i)
                                 self.pendingtasks[task.taskid].taskdict = None #remove taskdict in case it is big
+                                self.pendingtasks[task.taskid].workerid = workerid #remove taskdict in case it is big
 
                                 self.workers[workerid].lasttasktime = time.time()
                                 self.workers[workerid].taskname = task.taskname
@@ -314,21 +315,11 @@ class LoadBalancer:
                                 if task.taskname not in response['commandqueue']:
                                     response['commandqueue'][task.taskname] = {'number':0,'waitingtime':0}
                                 response['commandqueue'][task.taskname]['number'] += 1
-                                print(task.taskname,time.time()-task.submissiontime,response['commandqueue'][task.taskname]['waitingtime'])
                                 response['commandqueue'][task.taskname]['waitingtime'] = max(time.time()-task.submissiontime,response['commandqueue'][task.taskname]['waitingtime'])
 
                                 if task.priority not in response['priorityqueue']:
                                     response['priorityqueue'][task.priority] = 0
                                 response['priorityqueue'][task.priority] += 1
-
-                            #for i,task in enumerate(self.queue.tasks):
-                            #    response['queue'].append({'name':task.taskname, 'priority':task.priority, 'time': time.time()-task.submissiontime})
-
-                            #for taskid in self.pendingtasks:
-                            #    response['pending'].append({'name':self.pendingtasks[taskid].taskname, 'priority':self.pendingtasks[taskid].priority, 'time': time.time()-self.pendingtasks[taskid].submissiontime, 'progress':self.pendingtasks[taskid].progress})
-
-                            #for taskid in self.donetasks:
-                            #    response['done'].append({'name':self.donetasks[taskid].taskname, 'priority':self.donetasks[taskid].priority, 'time': time.time()-self.donetasks[taskid].resulttime})
 
                             self.healthSock.send_json(response)
                         elif msg['MONITOR'] == 'STATS':
@@ -389,7 +380,21 @@ class LoadBalancer:
                                     self.cancelledtasks[msg['taskid']].deletetime = time.time() + 120
                                     cancelstatus = {'deleted':True,'from':'done'}
                                 elif msg['taskid'] in self.pendingtasks:
-                                    cancelstatus = {'deleted':False,'from':'pending'}
+                                    #CANCEL PROSSES IN WORKER
+                                    try:
+                                        taskworker = self.pendingtasks[msg['taskid']].workerid
+                                        self.workers[taskworker].workersocket.send_json({'TASK':'CANCEL','taskid':msg['taskid']})
+                                        answer = self.workers[taskworker].workersocket.recv_json()
+                                        if answer == {'WK':'OK'}:
+                                            print("SUCCESS DELETING WORKING TASK",answer,taskworker,msg['taskid'])
+                                        else:
+                                            print("ERROR DELETING WORKING TASK",answer,taskworker,msg['taskid'])
+                                    except:
+                                        print("ERROR while canceling task",taskid)
+                                        pass
+                                    self.cancelledtasks[msg['taskid']] = self.pendingtasks.pop(msg['taskid']);
+                                    self.cancelledtasks[msg['taskid']].deletetime = time.time() + 120
+                                    cancelstatus = {'deleted':True,'from':'pending'}
                                 else:
                                     for i,task in enumerate(self.queue.tasks):
                                         if task.taskid == msg['taskid']:
