@@ -63,9 +63,9 @@ class learnTaskTimes:
 
 class LBWorker:
     def __init__(self, workerinfo, zmqcontext, sockettimeout):
-        workerid = workerinfo['workerid']
+        self.workerid = workerinfo['workerid']
         self.workerinfo = workerinfo
-        self.workerstate = 0
+        self.workerstate = 100
         self.workercpustate = 100
         self.lasttasktime = time.time()
         self.taskname  = None
@@ -84,12 +84,9 @@ class LBWorker:
     def refreshState(self): #def askWorkerReady(self,workerid):
         try:
             self.lasttasktime = time.time()
-            self.workersocket.send_json({'TASK': 'READY?'})
-            if self.workersocket.recv_json() == {'WK':'OK'}:
-                self.workerstate = 100
-            else:
-                self.workerstate = 0
-            return True
+            self.workersocket.send_json({'TASK': 'READY?','workerid':self.workerid})
+            self.workersocket.recv_json()
+            return
 
         except Exception as e:
             return False
@@ -190,8 +187,8 @@ class LoadBalancer:
                     if (task.priority >= self.workers[workerid].workerinfo['minpriority']) and (task.priority <= self.workers[workerid].workerinfo['maxpriority']):
                         try:
                             self.workers[workerid].workerstate = 0
-
-                            self.workers[workerid].workersocket.send_json({'TASK':task.taskdict,'TASKNAME':task.taskname,'taskid':task.taskid})
+                            print('SENDING TASK',task.taskid,'TO',workerid)
+                            self.workers[workerid].workersocket.send_json({'TASK':task.taskdict,'TASKNAME':task.taskname,'taskid':task.taskid,'workerid':workerid})
                             answer = self.workers[workerid].workersocket.recv_json()
                             if answer == {'WK':'OK'}:
                                 waitingtime = time.time() - task.submissiontime
@@ -234,24 +231,36 @@ class LoadBalancer:
                 ###### RECEIVE INFORMATION FROM A WORKER ############
                 if self.workerStateSock in sockets:
                     msg = self.workerStateSock.recv_json()
-                    if 'CPUonly' in msg:
-                        if (msg['workerid'] in self.workers):
-                            self.workers[msg['workerid']].workercpustate = msg['workercpustate']
-                    elif (msg['workerstate'] == "HELLO"):
+                    if ((msg['workerstate'] == "HELLO") or (msg['workerstate'] == "UP")):
                         if (msg['workerid'] not in self.workers):
-                            cprint("LB - RECEIVED HELLO MESSAGE FROM AN UNKWONN WORKER (%s). ADDING WORKER" % msg['workerid'], 'OKBLUE')
+                            cprint("LB - RECEIVED HELLO/UP MESSAGE FROM AN UNKWONN WORKER (%s). ADDING WORKER" % msg['workerid'], 'OKBLUE')
                             self.addWorker(msg)
                             self.workers[msg['workerid']].refreshState()
+                        elif (msg['workerstate'] == "HELLO"):
+                            cprint("LB - RECEIVED HELLO MESSAGE FROM KWONN WORKER (%s)." % msg['workerid'], 'OKBLUE')
+                            self.workers[msg['workerid']].taskname = msg['workingon']
+                            self.workers[msg['workerid']].taskid = msg['taskid']
+                            self.workers[msg['workerid']].workerstate = 100
+                            self.workers[msg['workerid']].workercpustate = msg['workercpustate']
+
+                    elif (msg['workerstate'] == -1):
+                        cprint('LB - Worker %s is DOWN. Removing it'%msg['workerid'], 'FAIL')
+                        if msg['workerid'] in self.workers:
+                            self.workers.pop(msg['workerid'])
+                    elif (msg['workerstate'] == "CPUonly"):
+                        if (msg['workerid'] in self.workers):
+                            self.workers[msg['workerid']].workercpustate = msg['workercpustate']
                     else:
                         if (msg['workerid'] in self.workers):
                             self.workers[msg['workerid']].workerstate = msg['workerstate']
+                            self.workers[msg['workerid']].workercpustate = msg['workercpustate']
                             if 'taskid' in msg :
                                 if msg['taskid'] in self.pendingtasks :
                                     self.pendingtasks[msg['taskid']].progress = msg['workerstate']
 
                             if (msg['workerstate'] == 100) and (self.workers[msg['workerid']].taskname != None):
                                 if msg['taskid'] != None:
-                                    #print('TASK',msg['taskid'],'DONE')
+                                    print('TASK',msg['taskid'],'DONE')
                                     timetocomplete = time.time() - self.workers[msg['workerid']].lasttasktime
                                     self.donetasks[msg['taskid']] = self.pendingtasks.pop(msg['taskid'])
                                     self.donetasks[msg['taskid']].timetocomplete = time.time() - self.workers[msg['workerid']].lasttasktime
@@ -373,17 +382,20 @@ class LoadBalancer:
                         elif msg['toLB'] == "CANCELTASK":
                             cancelstatus = {'deleted':False,'from':None}
                             if 'taskid' in msg:
-                                print('REVEIVED CANCEL TASK FROM CLIENT', msg['taskid'])
                                 if msg['taskid'] in self.donetasks:
                                     print('REVEIVED CANCEL TASK FROM CLIENT', msg['taskid'])
                                     self.cancelledtasks[msg['taskid']] = self.donetasks.pop(msg['taskid']);
                                     self.cancelledtasks[msg['taskid']].deletetime = time.time() + 120
                                     cancelstatus = {'deleted':True,'from':'done'}
                                 elif msg['taskid'] in self.pendingtasks:
+                                    print('TRYING TO CANCEL PENDING TASK', msg['taskid'])
                                     #CANCEL PROSSES IN WORKER
                                     try:
                                         taskworker = self.pendingtasks[msg['taskid']].workerid
-                                        self.workers[taskworker].workersocket.send_json({'TASK':'CANCEL','taskid':msg['taskid']})
+                                        print('     WORKER ', taskworker)
+                                        self.workers[taskworker].taskname = None
+                                        self.workers[taskworker].taskid = None
+                                        self.workers[taskworker].workersocket.send_json({'TASK':'CANCEL','taskid':msg['taskid'],'workerid':taskworker})
                                         answer = self.workers[taskworker].workersocket.recv_json()
                                         if answer == {'WK':'OK'}:
                                             print("SUCCESS DELETING WORKING TASK",answer,taskworker,msg['taskid'])
@@ -394,6 +406,7 @@ class LoadBalancer:
                                         pass
                                     self.cancelledtasks[msg['taskid']] = self.pendingtasks.pop(msg['taskid']);
                                     self.cancelledtasks[msg['taskid']].deletetime = time.time() + 120
+
                                     cancelstatus = {'deleted':True,'from':'pending'}
                                 else:
                                     for i,task in enumerate(self.queue.tasks):
