@@ -80,27 +80,20 @@ class WorkersHandler(tornado.web.RequestHandler):
 
         self.write(json.dumps(response_to_send))
 
-
-def main():
+def startMonitorServer(parametersfile=None,port=9000,adress="127.0.0.1"):
     global LB_HEALTHADRESS,LBReqSock
-
-    parser = argparse.ArgumentParser(description='Monitor Server Script for the pyLoadBalancer module.')
-    parser.add_argument('-p', '--pfile', default=None, help='parameter file, in JSON format')
-    parser.add_argument('-port', '--port', default=9000, help='web server port')
-    parser.add_argument('-a', '--adress', default='127.0.0.1', help='web server ip adress')
-    args = parser.parse_args()
     with open(os.path.join(os.path.dirname(__file__), '../parameters.json'), 'r') as fp:
         CONSTANTS = json.load(fp)  # Loading default constants
 
-    if args.pfile != None:
+    if parametersfile != None:
         try:
-            with open(args.pfile, 'r') as fp:
+            with open(parametersfile, 'r') as fp:
                 CONSTANTS.update(json.load(fp))  # updating constants with user defined ones
         except:
-            cprint('ERROR : %s is not a valid JSON file' % args.pfile, 'FAIL')
+            cprint('ERROR : %s is not a valid JSON file' % parametersfile, 'FAIL')
             sys.exit()
 
-    define("port", default=args.port, help="run on the given port", type=int)
+    define("port", default=port, help="run on the given port", type=int)
 
     LB_HEALTHADRESS = 'tcp://' + CONSTANTS['LB_IP'] + ':' + str(CONSTANTS['LB_HCREPPORT'])
     LBReqSock = context.socket(zmq.REQ)
@@ -113,8 +106,19 @@ def main():
         server = wsgiref.simple_server.make_server(args.adress, args.port, wsgi_app)
         server.serve_forever()
     else:
-        app.listen(options.port, address=args.adress)
+        app.listen(options.port, address=adress)
         tornado.ioloop.IOLoop.instance().start()
+
+def main():
+    global LB_HEALTHADRESS,LBReqSock
+
+    parser = argparse.ArgumentParser(description='Monitor Server Script for the pyLoadBalancer module.')
+    parser.add_argument('-p', '--pfile', default=None, help='parameter file, in JSON format')
+    parser.add_argument('-port', '--port', default=9000, help='web server port')
+    parser.add_argument('-a', '--adress', default='127.0.0.1', help='web server ip adress')
+    args = parser.parse_args()
+
+    startMonitorServer(parametersfile=args.pfile,port=args.port,adress=args.adress)
 
 
 if __name__ == "__main__":

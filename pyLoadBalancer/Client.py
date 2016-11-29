@@ -36,9 +36,19 @@ import traceback
 __all__ = ['Client'] #Only possible to import Client
 
 class Client:
-    def __init__(self):
+    def __init__(self, parametersfile = None):
+        ### Constants definitions ###
         with open(os.path.join(os.path.dirname(__file__), 'parameters.json'), 'r') as fp:
-            self.CONSTANTS = json.load(fp)
+            self.CONSTANTS = json.load(fp) #Loading default constants
+
+        if parametersfile != None:
+            try:
+                with open(parametersfile, 'r') as fp:
+                    self.CONSTANTS.update(json.load(fp)) #updating constants with user defined ones
+            except:
+                cprint('ERROR : %s is not a valid JSON file'%parametersfile, 'FAIL')
+                sys.exit()
+                
         self.context = zmq.Context()
 
     def openSock(self):
