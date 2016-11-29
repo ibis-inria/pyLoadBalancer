@@ -48,7 +48,7 @@ class Client:
             except:
                 cprint('ERROR : %s is not a valid JSON file'%parametersfile, 'FAIL')
                 sys.exit()
-                
+
         self.context = zmq.Context()
 
     def openSock(self):

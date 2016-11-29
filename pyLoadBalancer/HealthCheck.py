@@ -71,10 +71,8 @@ class HealthCheck:
                     'tcp://' + self.workers[workerid]['workerip'] + ':' + str(
                         self.workers[workerid]['workerhealthport']))
 
-        for workerid in self.workers:
-            time.sleep(0.001)
-            self.dealer.send(b"", zmq.SNDMORE)
-            self.dealer.send_json({"HEALTH": "CHECKWORKERS","workerid" : workerid})
+        self.dealer.send(b"", zmq.SNDMORE)
+        self.dealer.send_json({"HEALTH": "CHECKWORKERS","workerid" : [workerid for workerid in self.workers]})
 
         time.sleep(self.CONSTANTS['SOCKET_TIMEOUT']/1000.)
 

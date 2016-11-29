@@ -274,13 +274,15 @@ class WorkerHub:
 
             if self.HCrepSock in sockets:
                 msg = self.HCrepSock.recv_json()
+                print("WK: HCmsg")
                 if msg['HEALTH'] == 'CHECKWORKERS' and ('workerid' in msg):
-                    if msg['workerid'] in self.workers:
-                        self.HCrepSock.send_json({'workerid': msg['workerid'], 'workerstate' : self.workers[msg['workerid']].state})
-                        self.sendState(msg['workerid'], CPUonly=True)
+                    if isinstance(msg['workerid'],list):
+                        for workerid in msg['workerid']:
+                            if workerid in self.workers:
+                                self.HCrepSock.send_json({'workerid': workerid, 'workerstate' : self.workers[workerid].state})
+                                self.sendState(workerid, CPUonly=True)
                     else:
-                        self.HCrepSock.send_json({'workerid': msg['workerid'], 'workerstate' : -1})
-                        self.sendState(msg['workerid'], percentDone=-1)
+                        self.HCrepSock.send_json({msg['HEALTH']: 'COMMAND UNKNOWN'})
 
                 else:
                     self.HCrepSock.send_json({msg['HEALTH']: 'COMMAND UNKNOWN'})
