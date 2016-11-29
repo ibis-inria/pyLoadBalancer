@@ -277,12 +277,14 @@ class WorkerHub:
                 print("WK: HCmsg")
                 if msg['HEALTH'] == 'CHECKWORKERS' and ('workerid' in msg):
                     if isinstance(msg['workerid'],list):
+                        wkresponse = {}
                         for workerid in msg['workerid']:
                             if workerid in self.workers:
-                                self.HCrepSock.send_json({'workerid': workerid, 'workerstate' : self.workers[workerid].state})
+                                wkresponse[workerid] = self.workers[workerid].state
                                 self.sendState(workerid, CPUonly=True)
+                        self.HCrepSock.send_json(wkresponse)
                     else:
-                        self.HCrepSock.send_json({msg['HEALTH']: 'COMMAND UNKNOWN'})
+                        self.HCrepSock.send_json({msg['HEALTH']: 'workerid MUST BE LIST'})
 
                 else:
                     self.HCrepSock.send_json({msg['HEALTH']: 'COMMAND UNKNOWN'})

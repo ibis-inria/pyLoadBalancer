@@ -66,32 +66,37 @@ class HealthCheck:
 
     def checkWorkers(self):
 
+        connected = {}
         for workerid in self.workers:
-                self.dealer.connect(
-                    'tcp://' + self.workers[workerid]['workerip'] + ':' + str(
-                        self.workers[workerid]['workerhealthport']))
+            wkadress = 'tcp://' + self.workers[workerid]['workerip'] + ':' + str(self.workers[workerid]['workerhealthport'])
+            if not wkadress in connected:
+                self.dealer.connect(wkadress)
+                connected[wkadress] = True
+        print("CONNECTED", connected)
 
-        self.dealer.send(b"", zmq.SNDMORE)
-        self.dealer.send_json({"HEALTH": "CHECKWORKERS","workerid" : [workerid for workerid in self.workers]})
+        for wkadress in connected:
+            self.dealer.send(b"", zmq.SNDMORE)
+            self.dealer.send_json({"HEALTH": "CHECKWORKERS","workerid" : [workerid for workerid in self.workers]})
 
-        time.sleep(self.CONSTANTS['SOCKET_TIMEOUT']/1000.)
+        time.sleep(2*self.CONSTANTS['SOCKET_TIMEOUT']/1000.)
 
         for workerid in self.workers:
             self.workers[workerid]['workerstate'] = 0
         failed = 0
 
-        for i,worker in enumerate(self.workers):
+
+        for wkadress in connected:
             try:
-                self.dealer.recv()
+                print('RECV',self.dealer.recv())
                 response = self.dealer.recv_json()
-                if not 'workerid' in response:
-                    if response != {'WK':'FLUSHED'}:
-                        cprint('HC - GOT RESPONSE FROM AN UNKNOWN WORKER', 'FAIL')
-                if response['workerid'] in self.workers:
-                    self.workers[response['workerid']]['workerstate'] = response['workerstate']
+                print('RESPONSE')
+                print(response)
+                for workerid in response:
+                    if workerid in self.workers:
+                        self.workers[workerid]['workerstate'] = response[workerid]
 
             except Exception as e:
-                #cprint('    WORKER DID NOT ANSWER', 'FAIL')
+                cprint('    WORKER DID NOT ANSWER', 'FAIL')
                 #traceback.print_exc()
                 failed += 1
                 pass
@@ -100,12 +105,13 @@ class HealthCheck:
         #    cprint('HC - %d WORKERS DID NOT ANSWER' % failed, 'FAIL')
 
 
-        for workerid in self.workers:
+        for wkadress in connected:
             try:
-                self.dealer.disconnect('tcp://' + self.workers[workerid]['workerip'] + ':' + str(self.workers[workerid]['workerhealthport']))
+                self.dealer.disconnect(wkadress)
             except zmq.ZMQError:
+                print('COULD NOT DISCONNECT ', wkadress)
                 pass
-                #print('COULD NOT DISCONNECT ', 'tcp://' + self.workers[workerid]['workerip'] + ':' + str(self.workers[workerid]['workerhealthport']))
+
 
 
     def downWorker(self, workerid):
@@ -143,7 +149,7 @@ class HealthCheck:
 
         # If the worker has not done anything since 2 minutes, tell LB it is idle
         for workerid in self.workers:
-            if ((time.time() - self.workers[workerid]['lasttasktime']) > 120) and (self.workers[workerid]['workerstate'] == 0):
+            if ((time.time() - self.workers[workerid]['lasttasktime']) > 10) and (self.workers[workerid]['workerstate'] == 0):
                 cprint('HC - %s SEEMS DOWN (%ss and state=%s)'%(workerid,(time.time() - self.workers[workerid]['lasttasktime']),self.workers[workerid]['workerstate']), 'OKBLUE')
                 self.downWorker(workerid)
 
