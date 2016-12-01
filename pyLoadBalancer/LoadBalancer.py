@@ -178,6 +178,16 @@ class LoadBalancer:
     def addWorker(self, workerinfo):
         self.workers[workerinfo['workerid']] = LBWorker(workerinfo,self.context, self.CONSTANTS['SOCKET_TIMEOUT'])
 
+    def removeWorker(self, workerid):
+        if workerid in self.workers:
+            print("TASK IN CURRENT PENDING:",self.workers[workerid].taskid)
+            if self.workers[workerid].taskid in self.pendingtasks:
+                self.queue.tasks.insert(0, self.pendingtasks.pop( self.workers[workerid].taskid ) )
+                self.queue.tasks[0].workerid = None
+                print("TASK",self.workers[workerid].taskid,"PENDING ON",workerid,"IN QUEUE AGAIN")
+            self.workers.pop(workerid)
+
+
     def sendTasks(self):
 
         for workerid in self.sortedworkersid:
@@ -196,7 +206,6 @@ class LoadBalancer:
                                 #self.queue.taskshistory[task.taskid]['waitingtime'] = waitingtime
 
                                 self.pendingtasks[task.taskid] = self.queue.tasks.pop(i)
-                                self.pendingtasks[task.taskid].taskdict = None #remove taskdict in case it is big
                                 self.pendingtasks[task.taskid].workerid = workerid #remove taskdict in case it is big
 
                                 self.workers[workerid].lasttasktime = time.time()
@@ -244,9 +253,11 @@ class LoadBalancer:
                             self.workers[msg['workerid']].workercpustate = msg['workercpustate']
 
                     elif (msg['workerstate'] == -1):
-                        cprint('LB - Worker %s is DOWN. Removing it'%msg['workerid'], 'FAIL')
                         if msg['workerid'] in self.workers:
-                            self.workers.pop(msg['workerid'])
+                            cprint('LB - Worker %s is DOWN. Removing it'%msg['workerid'], 'FAIL')
+                            self.removeWorker(msg['workerid'])
+
+
                     elif (msg['workerstate'] == "CPUonly"):
                         if (msg['workerid'] in self.workers):
                             self.workers[msg['workerid']].workercpustate = msg['workercpustate']
@@ -306,8 +317,8 @@ class LoadBalancer:
                         elif msg['HEALTH'] == 'DOWNWORKER':
                             self.healthSock.send_json({'LB':'OK'})
                             if msg['workerid'] in self.workers:
+                                self.removeWorker(msg['workerid'])
                                 cprint('LB - Worker %s is DOWN. Removing it'%msg['workerid'], 'FAIL')
-                                self.workers.pop(msg['workerid'])
                         else:
                             self.healthSock.send_json({'LB':'ERROR'})
 

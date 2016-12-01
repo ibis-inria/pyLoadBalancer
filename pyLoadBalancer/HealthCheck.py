@@ -149,7 +149,7 @@ class HealthCheck:
 
         # If the worker has not done anything since 2 minutes, tell LB it is idle
         for workerid in self.workers:
-            if ((time.time() - self.workers[workerid]['lasttasktime']) > 60) and (self.workers[workerid]['workerstate'] == -1):
+            if ((time.time() - self.workers[workerid]['lasttasktime']) > 10) and (self.workers[workerid]['workerstate'] == -1):
                 cprint('HC - %s SEEMS DOWN (%ss and state=%s)'%(workerid,(time.time() - self.workers[workerid]['lasttasktime']),self.workers[workerid]['workerstate']), 'OKBLUE')
                 self.downWorker(workerid)
 
