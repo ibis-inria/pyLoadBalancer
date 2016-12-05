@@ -12,14 +12,16 @@ import zmq
 def workerloop(**kwargs):
     setProcessPriority(kwargs["processpriority"])
     test = 0
-    time.sleep(2) #sleep when start or restart
+    if "sleep" in kwargs:
+        time.sleep(kwargs["sleep"]) #sleep when start or restart
+
     conn = kwargs["conn"]
     conn.send({"HELLO":100})
 
     while True:
         msg = conn.recv()
         if ('funct' in msg) and ('taskname' in msg) and ('task' in msg) and ('arguments' in msg) :
-            print('WORKING ON',msg['taskname'])
+            #print('WORKING ON',msg['taskname'])
             taskresult = msg['funct'](task=msg['task'],arguments=msg['arguments'])
             conn.send(taskresult)
         else:
@@ -90,9 +92,9 @@ class Worker:
                 pass
             pass
 
-    def startProcess(self):
+    def startProcess(self,sleep=0):
         self.parent_conn, self.child_conn = multiprocessing.Pipe()
-        self.process = multiprocessing.Process(target=workerloop, kwargs={'conn': self.child_conn, 'id':self.id, 'processpriority':self.processpriority})
+        self.process = multiprocessing.Process(target=workerloop, kwargs={'conn': self.child_conn, 'id':self.id, 'processpriority':self.processpriority, 'sleep':sleep})
         self.process.start()
 
 
@@ -200,12 +202,12 @@ class WorkerHub:
             for workerid in self.workers:
                 if not self.workers[workerid].process.is_alive():
                     print('RESTARTING WORKER PROCESS',self.workers[workerid].id)
-                    self.workers[workerid].startProcess()
+                    self.workers[workerid].startProcess(5)
 
                 #getting worker results
                 while self.workers[workerid].parent_conn.poll():
                     result = self.workers[workerid].parent_conn.recv()
-                    print('GOT WORKER RESULT',result)
+                    #print('GOT WORKER RESULT',result)
                     if result == {"HELLO":100}:
                         self.workers[workerid].state = 100
                         self.workers[workerid].workingon = None
@@ -224,7 +226,7 @@ class WorkerHub:
                        #self.sendState(self.workers[workerid].state,workerid)
 
             if self.LBrepSock in sockets:
-                print('RECEIVING')
+                #print('RECEIVING')
                 msg = self.LBrepSock.recv_json()
                 #print("WORKER MSG", msg)
                 if ('workerid' not in msg) or (msg['workerid'] not in self.workers) :
@@ -260,7 +262,7 @@ class WorkerHub:
                         #SENDING TASK TO TASK FUNCTION
                         #print('WORKING ON TASK',msg['taskid'])
                         worker.parent_conn.send({'funct':self.taskList[msg['TASKNAME']]['funct'],'taskname':msg['TASKNAME'],'task':msg['TASK'],'arguments':self.taskList[msg['TASKNAME']]['kwargs']})
-                        print("TASK SENT TO WORKER")
+                        #print("TASK SENT TO WORKER")
                         #self.workingprocess = multiprocessing.Process(target=self.processtask, args=(self.taskList[msg['TASKNAME']]['funct'],self.taskresult, self.id), kwargs={'task':msg['TASK'],'arguments':self.taskList[msg['TASKNAME']]['kwargs']})
                         worker.state = 0
                         worker.workingon = msg['taskid']
@@ -274,7 +276,7 @@ class WorkerHub:
 
             if self.HCrepSock in sockets:
                 msg = self.HCrepSock.recv_json()
-                print("WK: HCmsg")
+                #print("WK: HCmsg")
                 if msg['HEALTH'] == 'CHECKWORKERS' and ('workerid' in msg):
                     if isinstance(msg['workerid'],list):
                         wkresponse = {}

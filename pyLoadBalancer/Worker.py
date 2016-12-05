@@ -189,9 +189,9 @@ class Worker:
         while True:
             if self.state < 100:
                 if not self.workingprocess.is_alive():
-                    print("WORKER SEEMS TO BE DONE")
+                    #print("WORKER SEEMS TO BE DONE")
                     self.workingprocess.join(100)
-                    print("RESULT", self.id in self.taskresult)
+                    #print("RESULT", self.id in self.taskresult)
                     self.sendState(100,resultmessage=self.taskresult[self.id],taskid=self.workingon)
                     self.state = 100
                     self.workingon = None
@@ -203,7 +203,7 @@ class Worker:
 
             if (not sockets) and (self.state == 100):
                 self.sayHello()
-                cprint('%s - %s - NOTHING TO DO' % (self.id, time.strftime('%H:%M:%S')), 'OKBLUE')
+                #cprint('%s - %s - NOTHING TO DO' % (self.id, time.strftime('%H:%M:%S')), 'OKBLUE')
                 self.sendCPUState()
                 self.sendState(self.state)
 
@@ -240,7 +240,7 @@ class Worker:
                     break
 
                 elif msg['TASKNAME'] in self.taskList:
-                    print("WORKER RECEIVED TASK")
+                    #print("WORKER RECEIVED TASK")
                     self.LBrepSock.send_json({'WK':'OK'})
                     #SENDING TASK TO TASK FUNCTION
                     #print('WORKING ON TASK',msg['taskid'])
@@ -248,9 +248,9 @@ class Worker:
                     self.workingprocess = multiprocessing.Process(target=self.processtask, args=(self.taskList[msg['TASKNAME']]['funct'],self.taskresult, self.id), kwargs={'task':msg['TASK'],'arguments':self.taskList[msg['TASKNAME']]['kwargs']})
                     self.state = 0
                     self.workingon = msg['taskid']
-                    print("STARTING PROCESS, RESULT",self.taskresult)
+                    #print("STARTING PROCESS, RESULT",self.taskresult)
                     self.workingprocess.start()
-                    print("PROCESS STARTED", self.workingprocess.is_alive())
+                    #print("PROCESS STARTED", self.workingprocess.is_alive())
                     ##taskresult = self.taskList[msg['TASKNAME']]['funct'](task=msg['TASK'],arguments=self.taskList[msg['TASKNAME']]['kwargs'])
 
                     # FINISHED TASK

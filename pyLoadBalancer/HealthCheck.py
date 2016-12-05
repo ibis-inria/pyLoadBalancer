@@ -72,7 +72,7 @@ class HealthCheck:
             if not wkadress in connected:
                 self.dealer.connect(wkadress)
                 connected[wkadress] = True
-        print("CONNECTED", connected)
+        #print("CONNECTED", connected)
 
         for wkadress in connected:
             self.dealer.send(b"", zmq.SNDMORE)
@@ -87,10 +87,9 @@ class HealthCheck:
 
         for wkadress in connected:
             try:
-                print('RECV',self.dealer.recv())
+                self.dealer.recv()
                 response = self.dealer.recv_json()
-                print('RESPONSE')
-                print(response)
+                #print(response)
                 for workerid in response:
                     if workerid in self.workers:
                         self.workers[workerid]['workerstate'] = response[workerid]
