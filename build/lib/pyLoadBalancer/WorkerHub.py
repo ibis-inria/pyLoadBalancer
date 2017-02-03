@@ -8,7 +8,6 @@ import multiprocessing
 import uuid
 import argparse
 import zmq
-from .colorprint import cprint
 
 def workerloop(**kwargs):
     setProcessPriority(kwargs["processpriority"])
@@ -173,20 +172,27 @@ class WorkerHub:
 
     def startWKHUB(self,workers):
 
-        cprint('Starting Worker Hub','OKGREEN')
-        cprint('   WKHUB_IP:','OKBLUE', self.ip)
-        cprint('   WKHUB_LBport:','OKBLUE', self.lbrepport)
-        cprint('   WKHUB_HCport:','OKBLUE', self.healthport)
+        print('Start Worker Hub')
+        print('    WKHUB_IP:', self.ip)
+        print('    WKHUB_LBport:', self.lbrepport)
+        print('    WKHUB_HCport:', self.healthport)
 
         for keys, values in self.CONSTANTS.items():
-            cprint('   ' + str(keys) + ':', 'OKBLUE', values)
+            print('   ', keys, ':', values)
 
         for i in range(0,len(workers),4):
             for n in range(0,workers[i]):
                 worker = Worker(workers[i+1] , workers[i+2], workers[i+3])
                 self.workers[worker.id] = worker
+                print('Start Worker ', self.workers[worker.id].id)
+                print('    WK_PRIORITY:', self.workers[worker.id].processpriority)
+                print('    WK_MINTASKPRIORITY:', self.workers[worker.id].mintaskpriority)
+                print('    WK_MAXTASKPRIORITY:', self.workers[worker.id].maxtaskpriority)
+
 
         while True:
+
+
             if time.time() - self.lastcpustate > 0.5:
                 self.cpustate = psutil.cpu_percent()
                 self.lastcpustate = time.time()
@@ -201,6 +207,7 @@ class WorkerHub:
                 #getting worker results
                 while self.workers[workerid].parent_conn.poll():
                     result = self.workers[workerid].parent_conn.recv()
+                    #print('GOT WORKER RESULT',result)
                     if result == {"HELLO":100}:
                         self.workers[workerid].state = 100
                         self.workers[workerid].workingon = None

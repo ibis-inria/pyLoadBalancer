@@ -33,7 +33,7 @@ import zmq
 import os.path
 import psutil
 import sys
-from .colorprint import cprint
+from .colorprint import cprint, bcolors
 import multiprocessing
 
 
@@ -177,15 +177,14 @@ class Worker:
 
     def startWK(self):
         cprint('Starting Worker %s : '%self.id, 'OKGREEN')
-
-        cprint('    WK_IP:', 'OKBLUE', self.ip)
-        cprint('    WK_LBport:', 'OKBLUE', self.lbrepport)
-        cprint('    WK_HCport:', 'OKBLUE', self.healthport)
-        cprint('    WK_PRIORITY:', 'OKBLUE', self.processpriority)
-        cprint('    MIN_TASK_PRIORITY:', 'OKBLUE', self.mintaskpriority)
-        cprint('    MAX_TASK_PRIORITY:', 'OKBLUE', self.maxtaskpriority)
+        print(bcolors.OKBLUE, '    WK_IP:', bcolors.ENDC, self.ip)
+        print(bcolors.OKBLUE, '    WK_LBport:', bcolors.ENDC, self.lbrepport)
+        print(bcolors.OKBLUE, '    WK_HCport:', bcolors.ENDC, self.healthport)
+        print(bcolors.OKBLUE, '    WK_PRIORITY:', bcolors.ENDC, self.processpriority)
+        print(bcolors.OKBLUE, '    MIN_TASK_PRIORITY:', bcolors.ENDC, self.mintaskpriority)
+        print(bcolors.OKBLUE, '    MAX_TASK_PRIORITY:', bcolors.ENDC, self.maxtaskpriority)
         for keys, values in self.CONSTANTS.items():
-            cprint('   '+ str(keys)+ ':','OKBLUE', values)
+            print(bcolors.OKBLUE,'   ', keys, ':',bcolors.ENDC, values)
 
         while True:
             if self.state < 100:

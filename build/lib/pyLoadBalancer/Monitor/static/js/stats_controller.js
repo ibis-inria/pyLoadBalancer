@@ -55,7 +55,7 @@ function refreshStats(){
   var dataToSend = JSON.stringify({iwouldlike: "STATS",});
   $.ajax(
           {
-              url: 'jsontoLB/',
+              url: window.location.href+'jsontoLB/',
               type: 'POST',
               data: dataToSend,
               contentType: 'application/json',

@@ -30,11 +30,13 @@ def setLBReqSock(LBReqSock):
     LBReqSock.setsockopt(zmq.REQ_RELAXED, 1)
     LBReqSock.setsockopt(zmq.LINGER, 0)  # Time before closing socket
     LBReqSock.connect(LB_HEALTHADRESS)
+    print('MONITOR - Conected to ', LB_HEALTHADRESS)
 
 def sendReq(LBReqSock,command):
     try:
         LBReqSock.connect(LB_HEALTHADRESS)
         command['MONITOR'] = command.pop('iwouldlike')
+        #print('SENDING : ', command)
         LBReqSock.send_json(command)
         return LBReqSock.recv_json()
     except Exception as e:
@@ -48,7 +50,6 @@ class Application(tornado.web.Application):
     def __init__(self):
         handlers = [
             (r"/", MainHandler),
-            (r"", MainHandler),
             (r"/jsontoLB/", WorkersHandler)
         ]
         settings = dict(
@@ -67,9 +68,15 @@ class MainHandler(tornado.web.RequestHandler):
 class WorkersHandler(tornado.web.RequestHandler):
     def post(self):
         json_obj = json_decode(self.request.body)
+        #print('Post data received')
+        #for key in list(json_obj.keys()):
+        #    print('key: %s , value: %s' % (key, json_obj[key]))
 
         if 'iwouldlike' in json_obj:
             response_to_send = sendReq(LBReqSock,json_obj)
+
+        #print('Response to return')
+        #pprint.pprint(response_to_send)
 
         self.write(json.dumps(response_to_send))
 

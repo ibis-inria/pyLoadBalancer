@@ -41,8 +41,8 @@
   </style>
 </head>
 
-<body>
-  <div style="margin:1rem; text-align:center;">
+<body style="margin:1rem; text-align:center;">
+  <div class="ui center aligned large header">Load Balancer Monitor</div>
 
     <div class="ui medium header">Live workers information</div>
 
@@ -129,18 +129,19 @@
       <canvas id="chartcalctimes"></canvas>
     </div>
 
-</div>
 
-<script>
-$( document ).ready(function(){
-  refreshWorkers();
-  refreshStats();
-  /*setInterval(function(){
+
+
+  <script>
+  $( document ).ready(function(){
+    refreshWorkers();
     refreshStats();
-  }, 2000);*/
-})
+    /*setInterval(function(){
+      refreshStats();
+    }, 2000);*/
+  })
 
-</script>
+  </script>
 </body>
 
 </html>

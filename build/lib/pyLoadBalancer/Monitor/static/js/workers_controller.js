@@ -7,7 +7,7 @@ function refreshWorkers() {
   var dataToSend = JSON.stringify({iwouldlike: "WORKERS",});
   $.ajax(
           {
-              url: 'jsontoLB/',
+              url: window.location.href+'jsontoLB/',
               type: 'POST',
               data: dataToSend,
               contentType: 'application/json',
@@ -112,69 +112,68 @@ function refreshQueueChart(queueData) {
         });
 
 
-    }
-
-    var currentTime = new Date();
-
-    for (var command in queueData){
-      newcommand = true;
-      queueChart.data.datasets.forEach(function(dataset, index) {
-        if (dataset.label == command){
-          newcommand = false;
-        }
-      });
-      if (newcommand){
-        console.log('adding command',command, currentcolori);
-        queueChart.data.datasets.push({label:command, data:[], fill:false,
-                                        borderColor:VERYLIGHTCOLORS[currentcolori],pointRadius:0,lineTension:0});
-        queueTimeChart.data.datasets.push({label:command, data:[], fill:false,
-                                        borderColor:VERYLIGHTCOLORS[currentcolori], pointRadius:0,lineTension:0});
-        currentcolori++;
-      }
-    }
-
-
-    var total = 0;
-    queueChart.data.datasets.forEach(function(dataset, index) {
-      var valuefound = false;
-      for (var command in queueData){
-        if (dataset.label == command){
-          dataset.data.push( {x:currentTime,y:queueData[command]['number']} );
-          total += queueData[command]['number'];
-          valuefound = true;
-        }
-      }
-      if (valuefound == false && dataset.label != 'Total'){
-        dataset.data.push( {x:currentTime,y:0} );
-      }
-      if ((dataset.data.length > 0) &&(currentTime - dataset.data[0].x > 60000)) {
-        dataset.data.splice(0,1);
-      }
-    });
-    console.log("TEST")
-    $("#totalqueingtasks").text(total.toFixed(0));
-    queueChart.data.datasets[0].data.push( {x:currentTime,y:total} );
-    queueChart.update();
-
-    var maxtime=0;
-    queueTimeChart.data.datasets.forEach(function(dataset, index) {
-      var valuefound = false;
-      for (var command in queueData){
-        if (dataset.label == command){
-          dataset.data.push( {x:currentTime,y:queueData[command]['waitingtime']} );
-          maxtime = Math.max(maxtime,queueData[command]['waitingtime'])
-          valuefound = true;
-        }
-      }
-      if (valuefound == false){
-        dataset.data.push( {x:currentTime,y:0} );
-      }
-      if (currentTime - dataset.data[0].x > 60000) {
-        dataset.data.splice(0,1);
-      }
-    });
-    $("#maxqueingtime").text(maxtime.toFixed(1)+"s");
-    queueTimeChart.update();
-
-
   }
+
+  var currentTime = new Date();
+
+  for (var command in queueData){
+    newcommand = true;
+    queueChart.data.datasets.forEach(function(dataset, index) {
+      if (dataset.label == command){
+        newcommand = false;
+      }
+    });
+    if (newcommand){
+      console.log('adding command',command, currentcolori);
+      queueChart.data.datasets.push({label:command, data:[], fill:false,
+                                      borderColor:VERYLIGHTCOLORS[currentcolori],pointRadius:0,lineTension:0});
+      queueTimeChart.data.datasets.push({label:command, data:[], fill:false,
+                                      borderColor:VERYLIGHTCOLORS[currentcolori], pointRadius:0,lineTension:0});
+      currentcolori++;
+    }
+  }
+
+
+  var total = 0;
+  queueChart.data.datasets.forEach(function(dataset, index) {
+    var valuefound = false;
+    for (var command in queueData){
+      if (dataset.label == command){
+        dataset.data.push( {x:currentTime,y:queueData[command]['number']} );
+        total += queueData[command]['number'];
+        valuefound = true;
+      }
+    }
+    if (valuefound == false && dataset.label != 'Total'){
+      dataset.data.push( {x:currentTime,y:0} );
+    }
+    if ((dataset.data.length > 0) &&(currentTime - dataset.data[0].x > 60000)) {
+      dataset.data.splice(0,1);
+    }
+  });
+  $("#totalqueingtasks").text(total.toFixed(0));
+  queueChart.data.datasets[0].data.push( {x:currentTime,y:total} );
+  queueChart.update();
+
+  var maxtime=0;
+  queueTimeChart.data.datasets.forEach(function(dataset, index) {
+    var valuefound = false;
+    for (var command in queueData){
+      if (dataset.label == command){
+        dataset.data.push( {x:currentTime,y:queueData[command]['waitingtime']} );
+        maxtime = Math.max(maxtime,queueData[command]['waitingtime'])
+        valuefound = true;
+      }
+    }
+    if (valuefound == false){
+      dataset.data.push( {x:currentTime,y:0} );
+    }
+    if (currentTime - dataset.data[0].x > 60000) {
+      dataset.data.splice(0,1);
+    }
+  });
+  $("#maxqueingtime").text(maxtime.toFixed(0));
+  queueTimeChart.update();
+
+
+}

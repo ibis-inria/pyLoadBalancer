@@ -20,7 +20,7 @@ import zmq
 import os.path
 import json
 import numpy as np
-from .colorprint import cprint
+from .colorprint import cprint, bcolors
 import sys
 import argparse
 import uuid
@@ -142,9 +142,10 @@ class LoadBalancer:
                 cprint('ERROR : %s is not a valid JSON file'%parametersfile, 'FAIL')
                 sys.exit()
 
+        print('pyLoadBalancer')
         cprint('Starting Load Balancer with the folllowing settings : ', 'OKGREEN')
         for keys, values in self.CONSTANTS.items():
-            cprint('   '+ str(keys) + ':', 'OKBLUE', values)
+            print(bcolors.OKBLUE,'   ', keys, ':',bcolors.ENDC, values)
 
         self.workers = {}
 
@@ -241,7 +242,7 @@ class LoadBalancer:
                     msg = self.workerStateSock.recv_json()
                     if ((msg['workerstate'] == "HELLO") or (msg['workerstate'] == "UP")):
                         if (msg['workerid'] not in self.workers):
-                            cprint("LB - ADDING WORKER (%s)" % msg['workerid'], 'OKGREEN')
+                            cprint("LB - RECEIVED HELLO/UP MESSAGE FROM AN UNKWONN WORKER (%s). ADDING WORKER" % msg['workerid'], 'OKBLUE')
                             self.addWorker(msg)
                             self.workers[msg['workerid']].refreshState()
                         elif (msg['workerstate'] == "HELLO"):

@@ -19,7 +19,7 @@ import os.path
 import time, datetime
 import json
 import argparse
-from .colorprint import cprint
+from .colorprint import cprint,bcolors
 import sys
 import traceback
 
@@ -40,9 +40,10 @@ class HealthCheck:
                 cprint('ERROR : %s is not a valid JSON file'%parametersfile, 'FAIL')
                 sys.exit()
 
+        print('pyLoadBalancer - Health Check')
         cprint('Starting Health Check with the folllowing settings : ', 'OKGREEN')
         for keys, values in self.CONSTANTS.items():
-            cprint('   '+ str(keys) + ':', 'OKBLUE', values)
+            print(bcolors.OKBLUE,'   ', keys, ':',bcolors.ENDC, values)
 
         self.LB_HEALTHADRESS = 'tcp://' + self.CONSTANTS['LB_IP'] + ':' + str(self.CONSTANTS['LB_HCREPPORT'])
 
@@ -61,6 +62,7 @@ class HealthCheck:
         self.LBReqSock.setsockopt(zmq.SNDTIMEO, self.CONSTANTS['SOCKET_TIMEOUT'])
         self.LBReqSock.setsockopt(zmq.REQ_RELAXED,1)
         self.LBReqSock.connect(self.LB_HEALTHADRESS)
+        print('HC - Conected to ', self.LB_HEALTHADRESS)
 
     def checkWorkers(self):
 
