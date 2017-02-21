@@ -89,8 +89,13 @@ class Client:
         return {'LB':'ERROR'}
 
     def getTask(self,taskid):
-        task = {'toLB' : 'GETTASK', 'taskid':taskid}
+        if isinstance(taskid,list) :
+            task = {'toLB' : 'GETTASKS', 'tasksid':taskid}
+        else :
+            task = {'toLB' : 'GETTASK', 'taskid':taskid}
+
         pushSock = self.openSock()
+
         try:
             pushSock.send_json(task)
             result = pushSock.recv_json()

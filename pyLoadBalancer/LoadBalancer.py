@@ -389,6 +389,29 @@ class LoadBalancer:
                                 if not isinqueue:
                                     self.clientSock.send_json({'progress':None,'result':None})
 
+                        elif msg['toLB'] == "GETTASKS":
+                            #print('REVEIVED GET TASKS FROM CLIENT', msg['tasksid'])
+                            answer = {}
+                            for taskid in msg['tasksid']:
+                                if taskid in self.cancelledtasks:
+                                    answer[taskid] = {'progress':'cancelled','result':None}
+                                elif taskid in self.donetasks:
+                                    answer[taskid] = {'progress':100,'result':self.donetasks[taskid].workerresult}
+                                    self.donetasks[taskid].deletetime = time.time() + 60 #Delete result 1min after client query (allow query again in short time)
+                                elif taskid in self.pendingtasks:
+                                    answer[taskid] = {'progress':self.pendingtasks[taskid].progress,'result':None}
+                                else:
+                                    isinqueue = False
+                                    for i,task in enumerate(self.queue.tasks):
+                                        if task.taskid == taskid:
+                                            isinqueue = True
+                                            answer[taskid] = {'progress':0,'result':None}
+                                    if not isinqueue:
+                                        answer[taskid] = {'progress':None,'result':None}
+
+                            self.clientSock.send_json(answer)
+
+
                         elif msg['toLB'] == "CANCELTASK":
                             cancelstatus = {'deleted':False,'from':None}
                             if 'taskid' in msg:
