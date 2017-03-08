@@ -1,4 +1,5 @@
-from colorama import Fore, Back, Style
+from colorama import Fore, Back, Style, init
+init()
 
 def cprint(text,color='',nexttext=''):
     if color == "OKBLUE":
