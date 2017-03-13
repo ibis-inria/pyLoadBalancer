@@ -1,7 +1,8 @@
 from colorama import Fore, Back, Style, init
 init()
 
-def cprint(text,color='',nexttext=''):
+
+def cprint(text, color='', nexttext=''):
     if color == "OKBLUE":
         color = Fore.BLUE + Style.BRIGHT
     elif color == "OKGREEN":
@@ -12,6 +13,5 @@ def cprint(text,color='',nexttext=''):
         color = Fore.RED + Style.BRIGHT
     else:
         return print(text, nexttext)
-
 
     return print(color, text, Style.RESET_ALL, nexttext)

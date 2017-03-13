@@ -33,42 +33,50 @@ import json
 import time
 import traceback
 
-__all__ = ['Client'] #Only possible to import Client
+__all__ = ['Client']  # Only possible to import Client
+
 
 class Client:
-    def __init__(self, parametersfile = None):
+    def __init__(self, parametersfile=None):
         ### Constants definitions ###
         with open(os.path.join(os.path.dirname(__file__), 'parameters.json'), 'r') as fp:
-            self.CONSTANTS = json.load(fp) #Loading default constants
+            self.CONSTANTS = json.load(fp)  # Loading default constants
 
         if parametersfile != None:
             try:
                 with open(parametersfile, 'r') as fp:
-                    self.CONSTANTS.update(json.load(fp)) #updating constants with user defined ones
+                    # updating constants with user defined ones
+                    self.CONSTANTS.update(json.load(fp))
             except:
-                cprint('ERROR : %s is not a valid JSON file'%parametersfile, 'FAIL')
+                cprint('ERROR : %s is not a valid JSON file' %
+                       parametersfile, 'FAIL')
                 sys.exit()
 
         self.context = zmq.Context()
 
     def openSock(self):
         pushSock = self.context.socket(zmq.REQ)
-        pushSock.setsockopt(zmq.RCVTIMEO, self.CONSTANTS['SOCKET_TIMEOUT'])  # Time out when asking worker
+        # Time out when asking worker
+        pushSock.setsockopt(zmq.RCVTIMEO, self.CONSTANTS['SOCKET_TIMEOUT'])
         pushSock.setsockopt(zmq.SNDTIMEO, self.CONSTANTS['SOCKET_TIMEOUT'])
         pushSock.setsockopt(zmq.LINGER, 0)  # Time before closing socket
-        pushSock.setsockopt(zmq.REQ_RELAXED,1)
-        pushSock.connect('tcp://'+self.CONSTANTS['LB_IP']+':'+str(self.CONSTANTS['LB_CLIENTPULLPORT']))
+        pushSock.setsockopt(zmq.REQ_RELAXED, 1)
+        pushSock.connect('tcp://' + self.CONSTANTS['LB_IP'] +
+                         ':' + str(self.CONSTANTS['LB_CLIENTPULLPORT']))
         return pushSock
 
     def resetSocket(pushSock):
-        self.pushSock.setsockopt(zmq.RCVTIMEO, self.CONSTANTS['LB_IP'])  # Time out when asking worker
+        # Time out when asking worker
+        self.pushSock.setsockopt(zmq.RCVTIMEO, self.CONSTANTS['LB_IP'])
         self.pushSock.setsockopt(zmq.SNDTIMEO, self.CONSTANTS['LB_IP'])
         self.pushSock.setsockopt(zmq.LINGER, 0)  # Time before closing socket
         self.pushSock.setsockopt(zmq.REQ_RELAXED, 1)
-        self.pushSock.connect('tcp://'+self.CONSTANTS['LB_IP']+':'+str(self.CONSTANTS['LB_CLIENTPULLPORT']))
+        self.pushSock.connect(
+            'tcp://' + self.CONSTANTS['LB_IP'] + ':' + str(self.CONSTANTS['LB_CLIENTPULLPORT']))
 
-    def sendTask(self,taskname,taskdict,priority=0):
-        task = {'toLB' : 'NEWTASK', 'priority':priority, 'taskdict' : taskdict, 'taskname' : taskname}
+    def sendTask(self, taskname, taskdict, priority=0):
+        task = {'toLB': 'NEWTASK', 'priority': priority,
+                'taskdict': taskdict, 'taskname': taskname}
         for i in range(3):
             try:
                 pushSock = self.openSock()
@@ -86,13 +94,13 @@ class Client:
                 time.sleep(1)
                 pass
 
-        return {'LB':'ERROR'}
+        return {'LB': 'ERROR'}
 
-    def getTask(self,taskid):
-        if isinstance(taskid,list) :
-            task = {'toLB' : 'GETTASKS', 'tasksid':taskid}
-        else :
-            task = {'toLB' : 'GETTASK', 'taskid':taskid}
+    def getTask(self, taskid):
+        if isinstance(taskid, list):
+            task = {'toLB': 'GETTASKS', 'tasksid': taskid}
+        else:
+            task = {'toLB': 'GETTASK', 'taskid': taskid}
 
         pushSock = self.openSock()
 
@@ -111,11 +119,10 @@ class Client:
             time.sleep(0.5)
             pass
 
-        return {'LB':'ERROR'}
+        return {'LB': 'ERROR'}
 
-
-    def cancelTask(self,taskid):
-        task = {'toLB' : 'CANCELTASK', 'taskid':taskid}
+    def cancelTask(self, taskid):
+        task = {'toLB': 'CANCELTASK', 'taskid': taskid}
         pushSock = self.openSock()
 
         try:
@@ -133,4 +140,4 @@ class Client:
             time.sleep(0.5)
             pass
 
-        return {'LB':'ERROR'}
+        return {'LB': 'ERROR'}

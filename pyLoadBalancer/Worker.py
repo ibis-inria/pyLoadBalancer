@@ -37,21 +37,23 @@ from .colorprint import cprint
 import multiprocessing
 
 
+__all__ = ['Worker']  # Only possible to import Client
 
-__all__ = ['Worker'] #Only possible to import Client
 
 class Worker:
-    def __init__(self, id, ip, lbrepport, healthport, processpriority = 0, parametersfile=None, mintaskpriority=0, maxtaskpriority=0):
+    def __init__(self, id, ip, lbrepport, healthport, processpriority=0, parametersfile=None, mintaskpriority=0, maxtaskpriority=0):
         ### Constants definitions ###
         with open(os.path.join(os.path.dirname(__file__), 'parameters.json'), 'r') as fp:
-            self.CONSTANTS = json.load(fp) #Loading default constants
+            self.CONSTANTS = json.load(fp)  # Loading default constants
 
         if parametersfile != None:
             try:
                 with open(parametersfile, 'r') as fp:
-                    self.CONSTANTS.update(json.load(fp)) #updating constants with user defined ones
+                    # updating constants with user defined ones
+                    self.CONSTANTS.update(json.load(fp))
             except:
-                cprint('ERROR : %s is not a valid JSON file'%parametersfile, 'FAIL')
+                cprint('ERROR : %s is not a valid JSON file' %
+                       parametersfile, 'FAIL')
                 sys.exit()
 
         self.setProcessPriority(processpriority)
@@ -67,7 +69,8 @@ class Worker:
         self.healthport = healthport
 
         self.pushStateSock = self.context.socket(zmq.PUSH)
-        self.pushStateSock.connect('tcp://' + self.CONSTANTS['LB_IP'] + ':' + str(self.CONSTANTS['LB_WKPULLPORT']))
+        self.pushStateSock.connect(
+            'tcp://' + self.CONSTANTS['LB_IP'] + ':' + str(self.CONSTANTS['LB_WKPULLPORT']))
 
         self.LBrepSock = self.context.socket(zmq.REP)
         self.LBrepSock.bind('tcp://' + ip + ':' + str(self.lbrepport))
@@ -84,7 +87,6 @@ class Worker:
         self.workingon = None
         self.manager = multiprocessing.Manager()
         self.taskresult = self.manager.dict()
-
 
     def setProcessPriority(self, priority):
         """ Set the priority of the process to below-normal."""
@@ -116,9 +118,10 @@ class Worker:
 
     def addTask(self, taskname, taskfunct, **kwargs):
         if taskname not in self.taskList:
-            self.taskList[taskname] = {'funct':taskfunct, 'kwargs':kwargs}
+            self.taskList[taskname] = {'funct': taskfunct, 'kwargs': kwargs}
         else:
-            cprint('TASK %s ALREADY EXISTS, SKIPPING addTask' % taskname, 'FAIL')
+            cprint('TASK %s ALREADY EXISTS, SKIPPING addTask' %
+                   taskname, 'FAIL')
 
     def rmvTask(self, taskname):
         if taskname in self.taskList:
@@ -127,8 +130,8 @@ class Worker:
     def sendState(self, percentDone, resultmessage=None, taskid=None, to='LB'):
         message = {'workerid': self.id, 'workerip': self.ip, 'workerport': self.lbrepport,
                    'workerhealthport': self.healthport, 'workerstate': percentDone,
-                   'workerpriority' : self.processpriority, 'minpriority' : self.mintaskpriority, 'maxpriority' : self.maxtaskpriority,
-                   'workerresult': resultmessage, 'taskid' : taskid}
+                   'workerpriority': self.processpriority, 'minpriority': self.mintaskpriority, 'maxpriority': self.maxtaskpriority,
+                   'workerresult': resultmessage, 'taskid': taskid}
         if to == 'LB':
             self.pushStateSock.send_json(message)
         if to == 'HEALTH':
@@ -139,7 +142,8 @@ class Worker:
         cpustate = psutil.cpu_percent()
         if cpustate == 0:
             return
-        message = {'workerid': self.id, 'CPUonly': True, 'workercpustate': cpustate}
+        message = {'workerid': self.id,
+                   'CPUonly': True, 'workercpustate': cpustate}
         if to == 'LB':
             self.pushStateSock.send_json(message)
         if to == 'HEALTH':
@@ -155,7 +159,7 @@ class Worker:
                 #print('FLUSHED : ',self.LBrepSock.recv_json())
                 try:
                     self.LBrepSock.recv_json()
-                    self.LBrepSock.send_json({'WK':'FLUSHED'})
+                    self.LBrepSock.send_json({'WK': 'FLUSHED'})
                 except:
                     break
                     pass
@@ -163,7 +167,7 @@ class Worker:
                 #print('FLUSHED : ',self.HCrepSock.recv_json())
                 try:
                     self.HCrepSock.recv_json()
-                    self.HCrepSock.send_json({'WK':'FLUSHED'})
+                    self.HCrepSock.send_json({'WK': 'FLUSHED'})
                 except:
                     break
                     pass
@@ -172,11 +176,11 @@ class Worker:
                 break
             socketstoflush = dict(self.poller.poll(50))
 
-    def processtask(self,taskfunct,resultdict,id,**kwargs):
+    def processtask(self, taskfunct, resultdict, id, **kwargs):
         resultdict[id] = taskfunct(**kwargs)
 
     def startWK(self):
-        cprint('Starting Worker %s : '%self.id, 'OKGREEN')
+        cprint('Starting Worker %s : ' % self.id, 'OKGREEN')
 
         cprint('    WK_IP:', 'OKBLUE', self.ip)
         cprint('    WK_LBport:', 'OKBLUE', self.lbrepport)
@@ -185,7 +189,7 @@ class Worker:
         cprint('    MIN_TASK_PRIORITY:', 'OKBLUE', self.mintaskpriority)
         cprint('    MAX_TASK_PRIORITY:', 'OKBLUE', self.maxtaskpriority)
         for keys, values in self.CONSTANTS.items():
-            cprint('   '+ str(keys)+ ':','OKBLUE', values)
+            cprint('   ' + str(keys) + ':', 'OKBLUE', values)
 
         while True:
             if self.state < 100:
@@ -193,14 +197,14 @@ class Worker:
                     #print("WORKER SEEMS TO BE DONE")
                     self.workingprocess.join(100)
                     #print("RESULT", self.id in self.taskresult)
-                    self.sendState(100,resultmessage=self.taskresult[self.id],taskid=self.workingon)
+                    self.sendState(
+                        100, resultmessage=self.taskresult[self.id], taskid=self.workingon)
                     self.state = 100
                     self.workingon = None
                     self.taskresult[self.id] = None
                 sockets = dict(self.poller.poll(100))
             else:
                 sockets = dict(self.poller.poll(10000))
-
 
             if (not sockets) and (self.state == 100):
                 self.sayHello()
@@ -216,7 +220,7 @@ class Worker:
                 if msg['TASK'] == 'CANCEL':
                     if (self.state < 100) and (self.workingprocess != None) and (self.workingprocess.is_alive()):
                         self.state = 100
-                        self.LBrepSock.send_json({'WK':'OK'})
+                        self.LBrepSock.send_json({'WK': 'OK'})
                         try:
                             self.workingprocess.terminate()
                         except:
@@ -226,27 +230,28 @@ class Worker:
                         time.sleep(1)
                         self.state = 100
                     else:
-                        self.LBrepSock.send_json({'WK':'ERROR'})
+                        self.LBrepSock.send_json({'WK': 'ERROR'})
 
                 elif (self.state < 100) and (self.workingprocess != None) and (self.workingprocess.is_alive()):
-                    self.LBrepSock.send_json({'WK':'ERROR'})
+                    self.LBrepSock.send_json({'WK': 'ERROR'})
 
                 elif msg['TASK'] == 'READY?':
-                    self.LBrepSock.send_json({'WK':'OK'})
+                    self.LBrepSock.send_json({'WK': 'OK'})
                     self.sendCPUState()
                     self.sendState(self.state)
 
                 elif msg['TASK'] == 'EXIT':
-                    self.LBrepSock.send_json({'WK':'OK'})
+                    self.LBrepSock.send_json({'WK': 'OK'})
                     break
 
                 elif msg['TASKNAME'] in self.taskList:
                     #print("WORKER RECEIVED TASK")
-                    self.LBrepSock.send_json({'WK':'OK'})
-                    #SENDING TASK TO TASK FUNCTION
+                    self.LBrepSock.send_json({'WK': 'OK'})
+                    # SENDING TASK TO TASK FUNCTION
                     #print('WORKING ON TASK',msg['taskid'])
                     self.taskresult[self.id] = None
-                    self.workingprocess = multiprocessing.Process(target=self.processtask, args=(self.taskList[msg['TASKNAME']]['funct'],self.taskresult, self.id), kwargs={'task':msg['TASK'],'arguments':self.taskList[msg['TASKNAME']]['kwargs']})
+                    self.workingprocess = multiprocessing.Process(target=self.processtask, args=(self.taskList[msg['TASKNAME']]['funct'], self.taskresult, self.id), kwargs={
+                                                                  'task': msg['TASK'], 'arguments': self.taskList[msg['TASKNAME']]['kwargs']})
                     self.state = 0
                     self.workingon = msg['taskid']
                     #print("STARTING PROCESS, RESULT",self.taskresult)
@@ -256,25 +261,25 @@ class Worker:
 
                     # FINISHED TASK
                     # FLUSHING SOCKETS received during calculation time
-                    #self.flushsockets()
+                    # self.flushsockets()
 
                     #print('TASK FINISHED',msg['taskid'], taskresult)
-                    #self.sendCPUState()
-                    #self.sendState(100,resultmessage=taskresult,taskid=msg['taskid'])
-
+                    # self.sendCPUState()
+                    # self.sendState(100,resultmessage=taskresult,taskid=msg['taskid'])
 
                 else:
-                    cprint('WORKER %s - UNKNOWN COMMAND %s'% (self.id, msg['TASKNAME']), 'FAIL')
-                    self.LBrepSock.send_json({'WK':'UNKNOWN'})
-
-
+                    cprint('WORKER %s - UNKNOWN COMMAND %s' %
+                           (self.id, msg['TASKNAME']), 'FAIL')
+                    self.LBrepSock.send_json({'WK': 'UNKNOWN'})
 
             if self.HCrepSock in sockets:
                 msg = self.HCrepSock.recv_json()
                 if msg['HEALTH'] == 'CHECKWORKERS' and ('workerid' in msg):
-                    self.HCrepSock.send_json({'workerid': self.id, 'workerstate' : 100})
+                    self.HCrepSock.send_json(
+                        {'workerid': self.id, 'workerstate': 100})
                 else:
-                    self.HCrepSock.send_json({msg['HEALTH']: 'COMMAND UNKNOWN'})
+                    self.HCrepSock.send_json(
+                        {msg['HEALTH']: 'COMMAND UNKNOWN'})
                 self.sendState(self.state)
                 self.sendCPUState()
         return
