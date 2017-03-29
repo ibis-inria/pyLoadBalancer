@@ -8,6 +8,8 @@ import multiprocessing
 import uuid
 import argparse
 import zmq
+import atexit
+import signal
 from .colorprint import cprint
 
 
@@ -22,6 +24,8 @@ def workerloop(**kwargs):
 
     while True:
         msg = conn.recv()
+        if ('exit' in msg):
+            break
         if ('funct' in msg) and ('taskname' in msg) and ('task' in msg) and ('arguments' in msg):
             #print('WORKING ON',msg['taskname'])
             taskresult = msg['funct'](
@@ -30,13 +34,6 @@ def workerloop(**kwargs):
         else:
             print('TASK NOT WELL FORMATTED', msg)
             conn.send({"WK": "ERROR"})
-
-        # if "HELLO" in msg:
-        #    conn.send({"HELLO":100})
-        # elif msg == "state":
-        #    conn.send({"ok":100})
-        # else:
-        #    conn.send({"WK":"ERROR"})
 
 
 def setProcessPriority(priority):
@@ -82,17 +79,20 @@ class Worker:
         self.laststate = time.time()
 
     def terminateProcess(self):
-        try:
-            print('TERMINATING PROCESS')
-            self.process.terminate()
-        except:
+        self.parent_conn.send({'exit': True})
+        self.process.join(1)
+        if self.process.is_alive():
             try:
-                print('TERMINATING PROCESS')
-                self.process.kill()
+                print(self.id, 'TERMINATING PROCESS')
+                self.process.terminate()
             except:
-                print('ERROR KILLING PROCESS')
+                try:
+                    print(self.id, 'KILLING PROCESS')
+                    self.process.kill()
+                except:
+                    print('ERROR KILLING PROCESS')
+                    pass
                 pass
-            pass
 
     def startProcess(self, sleep=0):
         self.parent_conn, self.child_conn = multiprocessing.Pipe()
@@ -102,7 +102,7 @@ class Worker:
 
 
 class WorkerHub:
-    def __init__(self, ip, lbrepport, healthport, parametersfile=None):
+    def __init__(self, parametersfile=None):
 
         with open(os.path.join(os.path.dirname(__file__), 'parameters.json'), 'r') as fp:
             self.CONSTANTS = json.load(fp)  # Loading default constants
@@ -118,20 +118,20 @@ class WorkerHub:
         self.manager = multiprocessing.Manager()
         self.workers = {}
 
-        self.ip = ip
+        self.ip = self.CONSTANTS['WKHUB_IP']
         self.context = zmq.Context()
-        self.lbrepport = lbrepport
-        self.healthport = healthport
+        self.lbrepport = self.CONSTANTS['WKHUB_LBPORT']
+        self.healthport = self.CONSTANTS['WKHUB_HCPORT']
 
         self.pushStateSock = self.context.socket(zmq.PUSH)
         self.pushStateSock.connect(
             'tcp://' + self.CONSTANTS['LB_IP'] + ':' + str(self.CONSTANTS['LB_WKPULLPORT']))
 
         self.LBrepSock = self.context.socket(zmq.REP)
-        self.LBrepSock.bind('tcp://' + ip + ':' + str(self.lbrepport))
+        self.LBrepSock.bind('tcp://' + self.ip + ':' + str(self.lbrepport))
 
         self.HCrepSock = self.context.socket(zmq.REP)
-        self.HCrepSock.bind('tcp://' + ip + ':' + str(self.healthport))
+        self.HCrepSock.bind('tcp://' + self.ip + ':' + str(self.healthport))
 
         self.poller = zmq.Poller()
         self.poller.register(self.LBrepSock, zmq.POLLIN)
@@ -140,6 +140,22 @@ class WorkerHub:
         self.taskList = {}
         self.cpustate = psutil.cpu_percent()
         self.lastcpustate = time.time()
+
+        atexit.register(self.terminateWKHub)
+        self.exiting = False
+
+        def signal_handler(signum, frame):
+            self.terminateWKHub()
+
+        signal.signal(signal.SIGTERM, signal_handler)
+
+    def terminateWKHub(self):
+        if not self.exiting:
+            #print("EXITING WORKER HUB")
+            self.exiting = True
+            for workerid in self.workers:
+                self.workers[workerid].terminateProcess()
+            sys.exit(0)
 
     def addTask(self, taskname, taskfunct, **kwargs):
         if taskname not in self.taskList:
@@ -176,7 +192,7 @@ class WorkerHub:
         if to == 'LB':
             self.pushStateSock.send_json(message)
 
-    def startWKHUB(self, workers):
+    def startWKHUB(self):
 
         cprint('Starting Worker Hub', 'OKGREEN')
         cprint('   WKHUB_IP:', 'OKBLUE', self.ip)
@@ -186,9 +202,10 @@ class WorkerHub:
         for keys, values in self.CONSTANTS.items():
             cprint('   ' + str(keys) + ':', 'OKBLUE', values)
 
-        for i in range(0, len(workers), 4):
-            for n in range(0, workers[i]):
-                worker = Worker(workers[i + 1], workers[i + 2], workers[i + 3])
+        for workerinfo in self.CONSTANTS['WKHUB_WORKERS']:
+            for n in range(workerinfo["nWorkers"]):
+                worker = Worker(
+                    workerinfo["minP"], workerinfo["maxP"], workerinfo["processP"])
                 self.workers[worker.id] = worker
 
         while True:
@@ -196,10 +213,10 @@ class WorkerHub:
                 self.cpustate = psutil.cpu_percent()
                 self.lastcpustate = time.time()
 
-            sockets = dict(self.poller.poll(400))
+            sockets = dict(self.poller.poll(200))
 
             for workerid in self.workers:
-                if not self.workers[workerid].process.is_alive():
+                if not self.workers[workerid].process.is_alive() and not self.exiting:
                     print('RESTARTING WORKER PROCESS',
                           self.workers[workerid].id)
                     self.workers[workerid].startProcess(5)
@@ -259,10 +276,8 @@ class WorkerHub:
                     elif msg['TASKNAME'] in self.taskList:
                         self.LBrepSock.send_json({'WK': 'OK'})
                         # SENDING TASK TO TASK FUNCTION
-                        #print('WORKING ON TASK',msg['taskid'])
                         worker.parent_conn.send({'funct': self.taskList[msg['TASKNAME']]['funct'], 'taskname': msg['TASKNAME'],
                                                  'task': msg['TASK'], 'arguments': self.taskList[msg['TASKNAME']]['kwargs']})
-                        #print("TASK SENT TO WORKER")
                         #self.workingprocess = multiprocessing.Process(target=self.processtask, args=(self.taskList[msg['TASKNAME']]['funct'],self.taskresult, self.id), kwargs={'task':msg['TASK'],'arguments':self.taskList[msg['TASKNAME']]['kwargs']})
                         worker.state = 0
                         worker.workingon = msg['taskid']

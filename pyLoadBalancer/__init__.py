@@ -5,6 +5,8 @@ This package contains a load balancer written in python than can route tasks (in
 __version__ = "0.0.1"
 
 from .Client import Client
-from .Worker import Worker
+from .WorkerHub import WorkerHub
 from .LoadBalancer import LoadBalancer
 from .HealthCheck import HealthCheck
+from .StartAll import startAll
+from .StartWorkerHub import startWorkerHub

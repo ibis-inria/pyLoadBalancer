@@ -211,14 +211,15 @@ class LoadBalancer:
     def sendTasks(self):
 
         for workerid in self.sortedworkersid:
+
             # there is at least a free worker
             if self.workers[workerid].workerstate >= 100:
-
                 for i, task in enumerate(self.queue.tasks):
                     if (task.priority >= self.workers[workerid].workerinfo['minpriority']) and (task.priority <= self.workers[workerid].workerinfo['maxpriority']):
                         try:
                             self.workers[workerid].workerstate = 0
-                            print('SENDING TASK', task.taskid, 'TO', workerid)
+                            #print('SENDING TASK', task.taskid, 'TO', workerid)
+                            #print(datetime.datetime.now().strftime("%H:%M:%S.%f"),'SENDING TASK', task.taskid, 'TO', workerid)
                             self.workers[workerid].workersocket.send_json(
                                 {'TASK': task.taskdict, 'TASKNAME': task.taskname, 'taskid': task.taskid, 'workerid': workerid})
                             answer = self.workers[workerid].workersocket.recv_json(
@@ -307,7 +308,7 @@ class LoadBalancer:
 
                             if (msg['workerstate'] == 100) and (self.workers[msg['workerid']].taskname != None):
                                 if msg['taskid'] != None:
-                                    print('TASK', msg['taskid'], 'DONE')
+                                    #print(datetime.datetime.now().strftime("%H:%M:%S.%f"),'TASK', msg['taskid'], 'DONE')
                                     timetocomplete = time.time() - \
                                         self.workers[msg['workerid']
                                                      ].lasttasktime

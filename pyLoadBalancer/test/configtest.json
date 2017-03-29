@@ -1,0 +1,19 @@
+{
+ "SOCKET_TIMEOUT" : 500,
+ "LB_IP": "127.0.0.1",
+ "LB_WKPULLPORT": 9560,
+ "LB_HCREPPORT" : 9561,
+ "LB_CLIENTPULLPORT" : 9562,
+
+ "MONITOR_IP": "127.0.0.1",
+ "MONITOR_PORT" : 9600,
+
+ "WKHUB_IP" : "127.0.0.1",
+ "WKHUB_LBPORT" : 9563,
+ "WKHUB_HCPORT" : 9564,
+ "WKHUB_WORKERS" :
+        [ {"nWorkers" : 2, "minP" : 0, "maxP": 9, "processP" : 10},
+          {"nWorkers" : 2, "minP" : 10, "maxP": 99, "processP" : 0},
+          {"nWorkers" : 2, "minP" : 100, "maxP": 1000, "processP" : 0}
+        ]
+}
