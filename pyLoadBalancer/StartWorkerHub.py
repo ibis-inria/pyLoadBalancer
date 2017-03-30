@@ -3,7 +3,7 @@
 # { 'taskname' : taskfunction, 'tasknumber2' : taskfunction2, ...}
 
 
-def startWorkerHub(pfile, tasks):
+def startWorkerHub(pfile, tasks, returnStartFct):
     import os
     import sys
     import multiprocessing
@@ -14,7 +14,10 @@ def startWorkerHub(pfile, tasks):
     atexit.register(WorkerHubProcess.terminate)
     WorkerHubProcess.start()
 
-    return WorkerHubProcess
+    if returnStartFct:
+        return [WorkerHubProcess, startWorkerHubProcess]
+    else:
+        return WorkerHubProcess
 
 
 def startWorkerHubProcess(pfile, tasks):

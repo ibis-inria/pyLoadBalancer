@@ -1,4 +1,4 @@
-def startAll(pfile):
+def startAll(pfile, returnStartFct=False):
     import os
     import sys
     import multiprocessing
@@ -16,8 +16,10 @@ def startAll(pfile):
         target=startMonitorProcess, args=(pfile,))
     atexit.register(MonitorProcess.terminate)
     MonitorProcess.start()
-
-    return [LBProcess, HCProcess, MonitorProcess]
+    if returnStartFct:
+        return [[LBProcess, HCProcess, MonitorProcess], [startLBProcess, startHCProcess, startMonitorProcess]]
+    else:
+        return [LBProcess, HCProcess, MonitorProcess]
 
 
 def startLBProcess(pfile):
