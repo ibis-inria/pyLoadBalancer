@@ -102,7 +102,7 @@ class HealthCheck:
                         self.workers[workerid]['workerstate'] = response[workerid]
 
             except Exception as e:
-                cprint('    WORKER DID NOT ANSWER', 'FAIL')
+                cprint('HC - Worker did not anwser', 'WARNING')
                 # traceback.print_exc()
                 failed += 1
                 pass

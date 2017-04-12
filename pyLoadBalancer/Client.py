@@ -85,13 +85,16 @@ class Client:
                 pushSock.close()
                 return result
             except:
-                print("sendTask ERROR WHILE SENDING/RECEIVING SOCKET")
-                traceback.print_exc()
                 try:
                     pushSock.close()
                 except:
                     pass
-                time.sleep(1)
+
+                if (i >= 2):
+                    print("sendTask ERROR WHILE SENDING/RECEIVING SOCKET")
+                    traceback.print_exc()
+                else:
+                    time.sleep(1)
                 pass
 
         return {'LB': 'ERROR'}
@@ -102,42 +105,49 @@ class Client:
         else:
             task = {'toLB': 'GETTASK', 'taskid': taskid}
 
-        pushSock = self.openSock()
-
-        try:
-            pushSock.send_json(task)
-            result = pushSock.recv_json()
-            pushSock.close()
-            return result
-        except:
-            print("getTask ERROR WHILE SENDING/RECEIVING SOCKET")
-            traceback.print_exc()
+        for i in range(3):
             try:
+                pushSock = self.openSock()
+                pushSock.send_json(task)
+                result = pushSock.recv_json()
                 pushSock.close()
+                return result
             except:
+                try:
+                    pushSock.close()
+                except:
+                    pass
+
+                if (i >= 2):
+                    print("getTask ERROR WHILE SENDING/RECEIVING SOCKET")
+                    traceback.print_exc()
+                else:
+                    time.sleep(1)
                 pass
-            time.sleep(0.5)
-            pass
 
         return {'LB': 'ERROR'}
 
     def cancelTask(self, taskid):
         task = {'toLB': 'CANCELTASK', 'taskid': taskid}
-        pushSock = self.openSock()
 
-        try:
-            pushSock.send_json(task)
-            result = pushSock.recv_json()
-            pushSock.close()
-            return result
-        except:
-            print("cancelTask ERROR WHILE SENDING/RECEIVING SOCKET")
-            traceback.print_exc()
+        for i in range(3):
             try:
+                pushSock = self.openSock()
+                pushSock.send_json(task)
+                result = pushSock.recv_json()
                 pushSock.close()
+                return result
             except:
+                try:
+                    pushSock.close()
+                except:
+                    pass
+
+                if (i >= 2):
+                    print("cancelTask ERROR WHILE SENDING/RECEIVING SOCKET")
+                    traceback.print_exc()
+                else:
+                    time.sleep(1)
                 pass
-            time.sleep(0.5)
-            pass
 
         return {'LB': 'ERROR'}

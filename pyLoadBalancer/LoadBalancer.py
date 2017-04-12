@@ -220,6 +220,7 @@ class LoadBalancer:
                             self.workers[workerid].workerstate = 0
                             #print('SENDING TASK', task.taskid, 'TO', workerid)
                             #print(datetime.datetime.now().strftime("%H:%M:%S.%f"),'SENDING TASK', task.taskid, 'TO', workerid)
+
                             self.workers[workerid].workersocket.send_json(
                                 {'TASK': task.taskdict, 'TASKNAME': task.taskname, 'taskid': task.taskid, 'workerid': workerid})
                             answer = self.workers[workerid].workersocket.recv_json(
@@ -250,9 +251,6 @@ class LoadBalancer:
                             cprint('LB - CAN\'T SEND TASK TO WORKER %s : %s' %
                                    (workerid, str(e)), 'FAIL')
                             traceback.print_exc()
-                            self.workers[workerid].workersocket.disconnect(
-                                'tcp://' + self.workers[workerid].workerinfo['workerip'] + ':' + str(
-                                    self.workers[workerid].workerinfo['workerport']))
                             self.workers[workerid].resetWorkerSocket()
                             pass
 
@@ -363,7 +361,8 @@ class LoadBalancer:
                         if msg['HEALTH'] == 'GIVEMEWORKERSLIST':
                             self.healthSock.send_json({workerid: {'workerip': self.workers[workerid].workerinfo['workerip'],
                                                                   'workerhealthport': self.workers[workerid].workerinfo['workerhealthport'],
-                                                                  'lasttasktime': self.workers[workerid].lasttasktime} for
+                                                                  'lasttasktime': self.workers[workerid].lasttasktime,
+                                                                  'taskname': self.workers[workerid].taskname} for
                                                        workerid in self.workers})
                         elif msg['HEALTH'] == 'DOWNWORKER':
                             self.healthSock.send_json({'LB': 'OK'})
@@ -488,8 +487,7 @@ class LoadBalancer:
                             cancelstatus = {'deleted': False, 'from': None}
                             if 'taskid' in msg:
                                 if msg['taskid'] in self.donetasks:
-                                    print(
-                                        'REVEIVED CANCEL TASK FROM CLIENT', msg['taskid'])
+                                    #print('REVEIVED CANCEL TASK FROM CLIENT', msg['taskid'])
                                     self.cancelledtasks[msg['taskid']
                                                         ] = self.donetasks.pop(msg['taskid'])
                                     self.cancelledtasks[msg['taskid']
@@ -497,24 +495,21 @@ class LoadBalancer:
                                     cancelstatus = {
                                         'deleted': True, 'from': 'done'}
                                 elif msg['taskid'] in self.pendingtasks:
-                                    print('TRYING TO CANCEL PENDING TASK',
-                                          msg['taskid'])
+                                    #print('TRYING TO CANCEL PENDING TASK',msg['taskid'])
                                     # CANCEL PROSSES IN WORKER
                                     try:
                                         taskworker = self.pendingtasks[msg['taskid']].workerid
-                                        print('     WORKER ', taskworker)
                                         self.workers[taskworker].taskname = None
                                         self.workers[taskworker].taskid = None
+                                        self.workers[taskworker].workerstate = 0
                                         self.workers[taskworker].workersocket.send_json(
                                             {'TASK': 'CANCEL', 'taskid': msg['taskid'], 'workerid': taskworker})
                                         answer = self.workers[taskworker].workersocket.recv_json(
                                         )
-                                        if answer == {'WK': 'OK'}:
-                                            print("SUCCESS DELETING WORKING TASK",
-                                                  answer, taskworker, msg['taskid'])
+                                        '''if answer == {'WK': 'OK'}:
+                                            print("SUCCESS DELETING WORKING TASK", answer, taskworker, msg['taskid'])
                                         else:
-                                            print("ERROR DELETING WORKING TASK",
-                                                  answer, taskworker, msg['taskid'])
+                                            print("ERROR DELETING WORKING TASK", answer, taskworker, msg['taskid'])'''
                                     except:
                                         print(
                                             "ERROR while canceling task", taskid)
@@ -569,7 +564,7 @@ class LoadBalancer:
                         if task.deletetime < time.time():
                             tasktopop.append(i)
                     for i in reversed(tasktopop):
-                        print('QUEUED TASK', task.taskid, 'TOO OLD DELETING')
+                        #print('QUEUED TASK', task.taskid, 'TOO OLD DELETING')
                         self.queue.tasks.pop(i)
 
                     tasktopop = []
@@ -577,7 +572,7 @@ class LoadBalancer:
                         if self.pendingtasks[taskid].deletetime < time.time():
                             tasktopop.append(taskid)
                     for taskid in reversed(tasktopop):
-                        print('PENDING TASK', taskid, 'TOO OLD DELETING')
+                        #print('PENDING TASK', taskid, 'TOO OLD DELETING')
                         self.pendingtasks.pop(taskid)
 
                     tasktopop = []
@@ -593,7 +588,7 @@ class LoadBalancer:
                         if self.cancelledtasks[taskid].deletetime < time.time():
                             tasktopop.append(taskid)
                     for taskid in reversed(tasktopop):
-                        print('CANCELLED TASK', taskid, 'TOO OLD DELETING')
+                        #print('CANCELLED TASK', taskid, 'TOO OLD DELETING')
                         self.cancelledtasks.pop(taskid)
 
                 ###### DO TASKS ############
