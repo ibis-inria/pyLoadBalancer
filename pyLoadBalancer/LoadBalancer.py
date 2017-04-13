@@ -42,9 +42,9 @@ class learnTaskTimes:
         self.command = command
 
     def cleanPoints(self):
-        #sqrerr =  ( np.fromiter(map(self.guessTime, self.learnParams), dtype='float') - self.learnTimes ) **2
-        #self.learnParams = self.learnParams[sqrerr < np.std(sqrerr)/2]
-        #self.learnTimes = self.learnTimes[sqrerr < np.std(sqrerr)/2]
+        # sqrerr =  ( np.fromiter(map(self.guessTime, self.learnParams), dtype='float') - self.learnTimes ) **2
+        # self.learnParams = self.learnParams[sqrerr < np.std(sqrerr)/2]
+        # self.learnTimes = self.learnTimes[sqrerr < np.std(sqrerr)/2]
         self.learnTimes = self.learnTimes[::4]
         self.learnParams = self.learnParams[::4]
 
@@ -107,7 +107,7 @@ class LBWorker:
 
 
 class LBTask:
-    def __init__(self, taskid, taskname, taskdict, priority):
+    def __init__(self, taskid, taskname, taskdict, priority, userid):
         self.taskid = taskid
         self.taskname = taskname
         self.taskdict = taskdict
@@ -117,19 +117,17 @@ class LBTask:
         self.workerresult = None
         self.resulttime = None
         self.deletetime = time.time() + 48 * 60 * 60  # autodelete in 48 hours
+        self.userid = userid
 
 
 class LBQueue:
     def __init__(self):
         self.tasks = []
         self.maxWaitTime = 0
-        self.taskshistory = {}
 
-    def addTask(self, taskname, taskdict, priority):
+    def addTask(self, taskname, taskdict, priority, userid):
         taskid = str(uuid.uuid4())
-        self.tasks.append(LBTask(taskid, taskname, taskdict, priority))
-        self.taskshistory[taskid] = {
-            'taskname': taskname, 'priority': taskdict}
+        self.tasks.append(LBTask(taskid, taskname, taskdict, priority, userid))
         return taskid
 
     def removeTask(self, taskid):
@@ -209,17 +207,41 @@ class LoadBalancer:
             self.workers.pop(workerid)
 
     def sendTasks(self):
-
+        if len(self.queue.tasks) < 1:
+            return
         for workerid in self.sortedworkersid:
 
             # there is at least a free worker
             if self.workers[workerid].workerstate >= 100:
-                for i, task in enumerate(self.queue.tasks):
-                    if (task.priority >= self.workers[workerid].workerinfo['minpriority']) and (task.priority <= self.workers[workerid].workerinfo['maxpriority']):
+                # selecting tasks that are within worker priority boundaries
+                queingtasks = [{'index': i, 'userid': t.userid} for i, t in enumerate(self.queue.tasks) if (t.priority >= self.workers[workerid].workerinfo['minpriority']) and (
+                    t.priority <= self.workers[workerid].workerinfo['maxpriority'])]
+                if len(queingtasks) < 1:
+                    continue
+
+                # listing users currently using workers (pendingtasks) and make
+                # a priority list
+                pendingusers = [
+                    self.pendingtasks[t].userid for t in self.pendingtasks]
+                userpriority = {uid: pendingusers.count(
+                    uid) for uid in set(pendingusers)}
+
+                # listing users in quening tasks, sort them by priority
+                queingusers = list(
+                    set([taskinfo.get('userid') for taskinfo in queingtasks]))
+                queingusers.sort(key=lambda uid: userpriority.get(uid, 0))
+                print("queingusers", queingusers)
+
+                for taskinfo in queingtasks:
+                    # Send first task corresponding to highest priority user
+                    if (taskinfo.get('userid') == queingusers[0]):
+                        i = taskinfo.get('index')
+                        task = self.queue.tasks[i]
                         try:
                             self.workers[workerid].workerstate = 0
-                            #print('SENDING TASK', task.taskid, 'TO', workerid)
-                            #print(datetime.datetime.now().strftime("%H:%M:%S.%f"),'SENDING TASK', task.taskid, 'TO', workerid)
+                            # print('SENDING TASK', task.taskid, 'TO', workerid)
+                            # print(datetime.datetime.now().strftime("%H:%M:%S.%f"),'SENDING
+                            # TASK', task.taskid, 'TO', workerid)
 
                             self.workers[workerid].workersocket.send_json(
                                 {'TASK': task.taskdict, 'TASKNAME': task.taskname, 'taskid': task.taskid, 'workerid': workerid})
@@ -227,8 +249,6 @@ class LoadBalancer:
                             )
                             if answer == {'WK': 'OK'}:
                                 waitingtime = time.time() - task.submissiontime
-
-                                #self.queue.taskshistory[task.taskid]['waitingtime'] = waitingtime
 
                                 self.pendingtasks[task.taskid] = self.queue.tasks.pop(
                                     i)
@@ -306,7 +326,8 @@ class LoadBalancer:
 
                             if (msg['workerstate'] == 100) and (self.workers[msg['workerid']].taskname != None):
                                 if msg['taskid'] != None:
-                                    #print(datetime.datetime.now().strftime("%H:%M:%S.%f"),'TASK', msg['taskid'], 'DONE')
+                                    # print(datetime.datetime.now().strftime("%H:%M:%S.%f"),'TASK',
+                                    # msg['taskid'], 'DONE')
                                     timetocomplete = time.time() - \
                                         self.workers[msg['workerid']
                                                      ].lasttasktime
@@ -320,7 +341,7 @@ class LoadBalancer:
                                                    ].resulttime = time.time()
                                     self.donetasks[msg['taskid']].deletetime = time.time(
                                     ) + 10 * 60  # result delete ten minutes
-                                    ##self.queue.taskshistory[msg['taskid']]['timetocomplete'] = self.donetasks[msg['taskid']].timetocomplete
+
                                     self.workers[msg['workerid']
                                                  ].taskname = None
                                     self.workers[msg['workerid']].taskid = None
@@ -406,7 +427,8 @@ class LoadBalancer:
                     msg = self.clientSock.recv_json()
                     if 'toLB' in msg:
                         if msg['toLB'] == "NEWTASK":
-                            #print('REVEIVED NEW TASK FROM CLIENT', msg['taskname'])
+                            # print('REVEIVED NEW TASK FROM CLIENT',
+                            # msg['taskname'])
                             try:
                                 if ('priority' in msg):
                                     try:
@@ -416,19 +438,40 @@ class LoadBalancer:
                                         pass
                                 else:
                                     priority = 0
-                                taskid = self.queue.addTask(
-                                    msg['taskname'], msg['taskdict'], priority)
-                                self.clientSock.send_json({'taskid': taskid})
+
+                                userid = None
+                                addtask = True
+                                if self.CONSTANTS['LB_QUEING_MAXPERUSER'] > 0:
+                                    if (msg.get('userid') == None):
+                                        addtask = False
+                                        self.clientSock.send_json(
+                                            {'error': 'User must send user id while sending a task'})
+                                    else:
+                                        userid = msg['userid']
+                                        print('USER', userid)
+                                        print('TASKS USERS', sum(
+                                            [task.userid == userid for task in self.queue.tasks]))
+                                        if sum([task.userid == userid for task in self.queue.tasks]) >= self.CONSTANTS['LB_QUEING_MAXPERUSER']:
+                                            addtask = False
+                                            self.clientSock.send_json(
+                                                {'error': 'User has too many pending task (%s)' % self.CONSTANTS['LB_QUEING_MAXPERUSER']})
+                                if addtask:
+                                    taskid = self.queue.addTask(
+                                        msg['taskname'], msg['taskdict'], priority, userid)
+                                    self.clientSock.send_json(
+                                        {'taskid': taskid})
                             except:
                                 self.clientSock.send_json(
                                     {"ERROR": "while adding task, please check message syntax"})
                                 print(
                                     "ERROR while adding task, please check client message syntax")
-                                print(msg)
+                                traceback.print_exc()
+
                                 pass
 
                         elif msg['toLB'] == "GETTASK":
-                            #print('REVEIVED GET TASK FROM CLIENT', msg['taskid'])
+                            # print('REVEIVED GET TASK FROM CLIENT',
+                            # msg['taskid'])
                             if msg['taskid'] in self.cancelledtasks:
                                 self.clientSock.send_json(
                                     {'progress': 'cancelled', 'result': None})
@@ -454,7 +497,8 @@ class LoadBalancer:
                                         {'progress': None, 'result': None})
 
                         elif msg['toLB'] == "GETTASKS":
-                            #print('REVEIVED GET TASKS FROM CLIENT', msg['tasksid'])
+                            # print('REVEIVED GET TASKS FROM CLIENT',
+                            # msg['tasksid'])
                             answer = {}
                             for taskid in msg['tasksid']:
                                 if taskid in self.cancelledtasks:
@@ -487,7 +531,8 @@ class LoadBalancer:
                             cancelstatus = {'deleted': False, 'from': None}
                             if 'taskid' in msg:
                                 if msg['taskid'] in self.donetasks:
-                                    #print('REVEIVED CANCEL TASK FROM CLIENT', msg['taskid'])
+                                    # print('REVEIVED CANCEL TASK FROM CLIENT',
+                                    # msg['taskid'])
                                     self.cancelledtasks[msg['taskid']
                                                         ] = self.donetasks.pop(msg['taskid'])
                                     self.cancelledtasks[msg['taskid']
@@ -495,7 +540,7 @@ class LoadBalancer:
                                     cancelstatus = {
                                         'deleted': True, 'from': 'done'}
                                 elif msg['taskid'] in self.pendingtasks:
-                                    #print('TRYING TO CANCEL PENDING TASK',msg['taskid'])
+                                    # print('TRYING TO CANCEL PENDING TASK',msg['taskid'])
                                     # CANCEL PROSSES IN WORKER
                                     try:
                                         taskworker = self.pendingtasks[msg['taskid']].workerid
@@ -507,7 +552,8 @@ class LoadBalancer:
                                         answer = self.workers[taskworker].workersocket.recv_json(
                                         )
                                         '''if answer == {'WK': 'OK'}:
-                                            print("SUCCESS DELETING WORKING TASK", answer, taskworker, msg['taskid'])
+                                            print("SUCCESS DELETING WORKING TASK",
+                                                  answer, taskworker, msg['taskid'])
                                         else:
                                             print("ERROR DELETING WORKING TASK", answer, taskworker, msg['taskid'])'''
                                     except:
@@ -547,14 +593,15 @@ class LoadBalancer:
                 ###### DISLPAY STATS ############
                 '''if (time.time() - self.lastdisplay) > 1:
                     self.lastdisplay = time.time()
-                    #states = [self.workers[workerid].workerstate for workerid in self.workers]
-                    #self.availworkers = len([s for s in states if s >= 100])
-                    #print('#################')
-                    #print('QUEUED', len(self.queue.tasks))
-                    #print('PENDING', len(self.pendingtasks))
-                    #print('DONE', len(self.donetasks))
-                    #for workerid in self.sortedworkersid:
-                    #   print(workerid, self.workers[workerid].workerstate, self.workers[workerid].workercpustate)
+                    # states = [self.workers[workerid].workerstate for workerid in self.workers]
+                    # self.availworkers = len([s for s in states if s >= 100])
+                    # print('#################')
+                    # print('QUEUED', len(self.queue.tasks))
+                    # print('PENDING', len(self.pendingtasks))
+                    # print('DONE', len(self.donetasks))
+                    # for workerid in self.sortedworkersid:
+                    # print(workerid, self.workers[workerid].workerstate,
+                    # self.workers[workerid].workercpustate)
                 '''
                 ###### REMOVE OLD RESULTS ######
                 if (time.time() - self.lastresultdelete) > 1:
@@ -564,7 +611,7 @@ class LoadBalancer:
                         if task.deletetime < time.time():
                             tasktopop.append(i)
                     for i in reversed(tasktopop):
-                        #print('QUEUED TASK', task.taskid, 'TOO OLD DELETING')
+                        # print('QUEUED TASK', task.taskid, 'TOO OLD DELETING')
                         self.queue.tasks.pop(i)
 
                     tasktopop = []
@@ -572,7 +619,7 @@ class LoadBalancer:
                         if self.pendingtasks[taskid].deletetime < time.time():
                             tasktopop.append(taskid)
                     for taskid in reversed(tasktopop):
-                        #print('PENDING TASK', taskid, 'TOO OLD DELETING')
+                        # print('PENDING TASK', taskid, 'TOO OLD DELETING')
                         self.pendingtasks.pop(taskid)
 
                     tasktopop = []
@@ -580,7 +627,7 @@ class LoadBalancer:
                         if self.donetasks[taskid].deletetime < time.time():
                             tasktopop.append(taskid)
                     for taskid in reversed(tasktopop):
-                        #print('DONE TASK',taskid,'TOO OLD DELETING')
+                        # print('DONE TASK',taskid,'TOO OLD DELETING')
                         self.donetasks.pop(taskid)
 
                     tasktopop = []
@@ -588,7 +635,7 @@ class LoadBalancer:
                         if self.cancelledtasks[taskid].deletetime < time.time():
                             tasktopop.append(taskid)
                     for taskid in reversed(tasktopop):
-                        #print('CANCELLED TASK', taskid, 'TOO OLD DELETING')
+                        # print('CANCELLED TASK', taskid, 'TOO OLD DELETING')
                         self.cancelledtasks.pop(taskid)
 
                 ###### DO TASKS ############

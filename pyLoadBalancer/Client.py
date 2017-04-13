@@ -74,9 +74,9 @@ class Client:
         self.pushSock.connect(
             'tcp://' + self.CONSTANTS['LB_IP'] + ':' + str(self.CONSTANTS['LB_CLIENTPULLPORT']))
 
-    def sendTask(self, taskname, taskdict, priority=0):
+    def sendTask(self, taskname, taskdict, priority=0, userid=None):
         task = {'toLB': 'NEWTASK', 'priority': priority,
-                'taskdict': taskdict, 'taskname': taskname}
+                'taskdict': taskdict, 'taskname': taskname, 'userid': userid}
         for i in range(3):
             try:
                 pushSock = self.openSock()
