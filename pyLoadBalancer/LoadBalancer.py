@@ -230,7 +230,6 @@ class LoadBalancer:
                 queingusers = list(
                     set([taskinfo.get('userid') for taskinfo in queingtasks]))
                 queingusers.sort(key=lambda uid: userpriority.get(uid, 0))
-                print("queingusers", queingusers)
 
                 for taskinfo in queingtasks:
                     # Send first task corresponding to highest priority user
@@ -448,9 +447,6 @@ class LoadBalancer:
                                             {'error': 'User must send user id while sending a task'})
                                     else:
                                         userid = msg['userid']
-                                        print('USER', userid)
-                                        print('TASKS USERS', sum(
-                                            [task.userid == userid for task in self.queue.tasks]))
                                         if sum([task.userid == userid for task in self.queue.tasks]) >= self.CONSTANTS['LB_QUEING_MAXPERUSER']:
                                             addtask = False
                                             self.clientSock.send_json(
