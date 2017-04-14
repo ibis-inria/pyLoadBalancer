@@ -8,10 +8,18 @@ def startWorkerHub(pfile, tasks, returnStartFct):
     import sys
     import multiprocessing
     import atexit
+    import signal
 
     WorkerHubProcess = multiprocessing.Process(
         target=startWorkerHubProcess, args=(pfile, tasks))
-    atexit.register(WorkerHubProcess.terminate)
+
+    def on_exit(*args):
+        WorkerHubProcess.terminate()
+        WorkerHubProcess.join()
+
+    atexit.register(on_exit)
+    signal.signal(signal.SIGTERM, on_exit)
+    signal.signal(signal.SIGINT, on_exit)
     WorkerHubProcess.start()
 
     if returnStartFct:
@@ -23,12 +31,18 @@ def startWorkerHub(pfile, tasks, returnStartFct):
 def startWorkerHubProcess(pfile, tasks):
     import os
     import sys
+    import atexit
+    import signal
     from pyLoadBalancer.WorkerHub import WorkerHub
 
     WKHub = WorkerHub(parametersfile=pfile)
 
     for task in tasks:
         WKHub.addTask(task, tasks[task])
+
+    atexit.register(WKHub.terminateWKHub)
+    signal.signal(signal.SIGTERM, WKHub.terminateWKHub)
+    signal.signal(signal.SIGINT, WKHub.terminateWKHub)
 
     WKHub.startWKHUB()
 

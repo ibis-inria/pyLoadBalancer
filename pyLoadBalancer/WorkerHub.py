@@ -162,9 +162,9 @@ class WorkerHub:
 
         signal.signal(signal.SIGTERM, signal_handler)'''
 
-    def terminateWKHub(self):
+    def terminateWKHub(self, *args):
         if not self.exiting:
-            # print("EXITING WORKER HUB")
+            print("EXITING WORKER HUB")
             self.exiting = True
             for workerid in self.workers:
                 self.workers[workerid].terminateProcess()
