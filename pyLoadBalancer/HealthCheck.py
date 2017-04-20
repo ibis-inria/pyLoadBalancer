@@ -23,6 +23,8 @@ import argparse
 from .colorprint import cprint
 import sys
 import traceback
+import atexit
+import signal
 
 __all__ = ['HealthCheck']  # Only possible to import Client
 
@@ -59,6 +61,14 @@ class HealthCheck:
         self.dealer.setsockopt(zmq.RCVTIMEO, 0)  # Time out when asking worker
         self.dealer.setsockopt(zmq.SNDTIMEO, self.CONSTANTS['SOCKET_TIMEOUT'])
         self.dealer.setsockopt(zmq.LINGER, 0)  # Time before closing socket
+
+        self.exiting = False
+        atexit.register(self.on_exit)
+        signal.signal(signal.SIGTERM, self.on_exit)
+        signal.signal(signal.SIGINT, self.on_exit)
+
+    def on_exit(self, *args):
+        self.exiting = True
 
     def setLBReqSock(self):
         #self.LBReqSock = self.context.socket(zmq.REQ)
@@ -169,6 +179,9 @@ class HealthCheck:
 
     def startHC(self, checkTimer=1):
         while True:
+            if self.exiting:
+                cprint("EXITED Health Check", "OKGREEN")
+                break
             self.doHealthCheckTasks()
             time.sleep(checkTimer)
 

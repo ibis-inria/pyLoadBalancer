@@ -26,6 +26,8 @@ import sys
 import argparse
 import uuid
 import traceback
+import atexit
+import signal
 
 __all__ = ['LoadBalancer']  # Only possible to import Client
 
@@ -191,6 +193,14 @@ class LoadBalancer:
 
         self.stats = {}
 
+        self.exiting = False
+        atexit.register(self.on_exit)
+        signal.signal(signal.SIGTERM, self.on_exit)
+        signal.signal(signal.SIGINT, self.on_exit)
+
+    def on_exit(self, *args):
+        self.exiting = True
+
     def addWorker(self, workerinfo):
         self.workers[workerinfo['workerid']] = LBWorker(
             workerinfo, self.context, self.CONSTANTS['SOCKET_TIMEOUT'])
@@ -280,7 +290,11 @@ class LoadBalancer:
 
         while True:
             try:
-                sockets = dict(self.poller.poll())
+                if self.exiting:
+                    cprint("EXITED Load Balancer", "OKGREEN")
+                    break
+
+                sockets = dict(self.poller.poll(500))
 
                 ###### RECEIVE INFORMATION FROM A WORKER ############
                 if self.workerStateSock in sockets:
@@ -639,7 +653,8 @@ class LoadBalancer:
 
             except KeyboardInterrupt:
                 # interupt loop = close LB
-                raise
+                cprint("LB KeyboardInterrupt", "FAIL")
+                sys.exit()
             except:
                 # something when wrong in loop
                 traceback.print_exc()

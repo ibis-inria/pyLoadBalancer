@@ -85,25 +85,39 @@ class Worker:
         self.laststate = time.time()
 
     def terminateProcess(self):
-        self.parent_conn.send({'exit': False})
-        exitfailed = True
-        while self.parent_conn.poll(0.1):
-            exitresult = self.parent_conn.recv()
-            if exitresult == {'exit': True}:
-                exitfailed = False
-                self.parent_conn.send({'exit': True})
+        if self.pid != None:
+            cprint('EXITING ' + str(self.id), 'OKBLUE')
+            self.parent_conn.send({'exit': False})
+            time.sleep(0.2)
+            exitfailed = True
+            while self.parent_conn.poll():
+                exitresult = self.parent_conn.recv()
+                if exitresult == {'exit': True}:
+                    exitfailed = False
+                    self.parent_conn.send({'exit': True})
+                    cprint('EXITED ' + str(self.id), 'OKGREEN')
 
-        if exitfailed:
-            try:
-                # print('##', self.id, '-Terminating Worker PROCESS')
-                self.process.terminate()
-            except:
+            if exitfailed:
                 try:
-                    print('##', self.id, '-KILLING Worker PROCESS')
-                    self.process.kill()
+                    cprint('TERMINATING ' + str(self.id), 'OKBLUE')
+                    self.process.terminate()
+                    self.process.join(0.1)
+                    if self.process.is_alive():
+                        self.killProcess()
                 except:
-                    print('##', self.id, '-ERROR KILLING PROCESS')
+                    cprint('CAN\'T TERMINATE' + str(self.id), 'WARNING')
+                    self.killProcess()
                     pass
+
+    def killProcess(self):
+        if self.pid != None:
+            try:
+                cprint('# Killing' + str(self.id) +
+                       '(' + str(self.pid) + ')', 'WARNING')
+                os.kill(self.pid, signal.SIGKILL)
+            except:
+                cprint('# FAILED Killing' + str(self.id) +
+                       '(' + str(self.pid) + ')', 'FAIL')
                 pass
 
     def startProcess(self, sleep=0):
@@ -111,6 +125,7 @@ class Worker:
         self.process = multiprocessing.Process(target=workerloop, kwargs={
                                                'conn': self.child_conn, 'id': self.id, 'processpriority': self.processpriority, 'sleep': sleep})
         self.process.start()
+        self.pid = self.process.pid
 
 
 class WorkerHub:
@@ -154,6 +169,9 @@ class WorkerHub:
         self.lastcpustate = time.time()
 
         atexit.register(self.terminateWKHub)
+        signal.signal(signal.SIGTERM, self.terminateWKHub)
+        signal.signal(signal.SIGINT, self.terminateWKHub)
+
         self.exiting = False
 
         '''def signal_handler(signum, frame):
@@ -165,9 +183,6 @@ class WorkerHub:
     def terminateWKHub(self, *args):
         if not self.exiting:
             self.exiting = True
-            for workerid in self.workers:
-                self.workers[workerid].terminateProcess()
-            sys.exit(0)
 
     def addTask(self, taskname, taskfunct, **kwargs):
         if taskname not in self.taskList:
@@ -221,6 +236,13 @@ class WorkerHub:
                 self.workers[worker.id] = worker
 
         while True:
+            if self.exiting:
+                cprint("EXITING Worker Hub", "OKBLUE")
+                for workerid in self.workers:
+                    self.workers[workerid].terminateProcess()
+                time.sleep(2)
+                break
+
             if time.time() - self.lastcpustate > 0.5:
                 self.cpustate = psutil.cpu_percent()
                 self.lastcpustate = time.time()

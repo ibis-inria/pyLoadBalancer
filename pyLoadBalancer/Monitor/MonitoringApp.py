@@ -13,6 +13,8 @@ from ..colorprint import cprint
 import argparse
 import sys
 from tornado.options import define, options
+import atexit
+import signal
 
 from tornado.wsgi import WSGIAdapter
 import wsgiref.simple_server
@@ -79,7 +81,7 @@ class WorkersHandler(tornado.web.RequestHandler):
 
 
 def startMonitorServer(parametersfile=None):
-    global LB_HEALTHADRESS, LBReqSock
+    global LB_HEALTHADRESS, LBReqSock, exiting
     with open(os.path.join(os.path.dirname(__file__), '../parameters.json'), 'r') as fp:
         CONSTANTS = json.load(fp)  # Loading default constants
 
@@ -110,7 +112,17 @@ def startMonitorServer(parametersfile=None):
         server.serve_forever()
     else:
         app.listen(options.port, address=CONSTANTS['MONITOR_IP'])
-        tornado.ioloop.IOLoop.instance().start()
+        loop = tornado.ioloop.IOLoop.instance()
+
+        def sighup_handler(*args):
+            cprint("EXITING Monitor", "OKBLUE")
+            loop.stop()
+
+        atexit.register(sighup_handler)
+        signal.signal(signal.SIGTERM, sighup_handler)
+        signal.signal(signal.SIGINT, sighup_handler)
+        loop.start()
+        cprint("EXITED Monitor", "OKGREEN")
 
 
 def main():

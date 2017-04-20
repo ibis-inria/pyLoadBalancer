@@ -2,19 +2,16 @@ def startAll(pfile, returnStartFct=False):
     import os
     import sys
     import multiprocessing
-    import atexit
+    import time
 
     LBProcess = multiprocessing.Process(target=startLBProcess, args=(pfile,))
-    atexit.register(LBProcess.terminate)
     LBProcess.start()
 
     HCProcess = multiprocessing.Process(target=startHCProcess, args=(pfile,))
-    atexit.register(HCProcess.terminate)
     HCProcess.start()
 
     MonitorProcess = multiprocessing.Process(
         target=startMonitorProcess, args=(pfile,))
-    atexit.register(MonitorProcess.terminate)
     MonitorProcess.start()
     if returnStartFct:
         return [[LBProcess, HCProcess, MonitorProcess], [startLBProcess, startHCProcess, startMonitorProcess]]
@@ -40,7 +37,7 @@ def startHCProcess(pfile):
     # sys.stdout = open(os.path.join('log','HC.log'), 'a+')
     # sys.stderr = open(os.path.join('log','HC_error.log'), 'a+')
     HC = HealthCheck(parametersfile=pfile)
-    time.sleep(1)
+    time.sleep(3)
     HC.startHC()
 
 
