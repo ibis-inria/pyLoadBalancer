@@ -18,11 +18,11 @@ python setup.py install
 ### Getting Started
 
 The pyLoadBalancer Package contains 5 main objects:
-1. The {+Load Balancer+}, that distribute tasks
-2. The {+Client+}, that send tasks
-3. The {+Worker+}, that receive tasks
-4. The {+Health Check+}, that check the status of the Load Balancer *(optional)*
-5. The {+Monitor+}, a small web server that displays information on the Load Balancer *(optional)*
+1. The `Load Balancer`, that distribute tasks
+2. The `Client`, that send tasks
+3. The `Worker`, that receive tasks
+4. The `Health Check`, that check the status of the Load Balancer *(optional)*
+5. The `Monitor`, a small web server that displays information on the Load Balancer *(optional)*
 
 The following scheme explains the relationship:
 
@@ -106,9 +106,9 @@ startAll('parameters.json')
 Where `parameters.json` is a parameter file as defined in the previous section.
 
 The `startAll()` function starts the core of the Load Balancer:
-- The {+Load Balancer+}, that distribute tasks
-- The {+Helth Check+}, that check the status of the Load Balancer *(optional)*
-- The {+Monitor+}, a small web server that displays information on the Load Balancer *(optional)*
+- The `Load Balancer`, that distribute tasks
+- The `Helth Check`, that check the status of the Load Balancer *(optional)*
+- The `Monitor`, a small web server that displays information on the Load Balancer *(optional)*
 
 There is still no client to ask for a job and no workers to do it, the HealthCheck should therefore print the following warning :
 
@@ -157,7 +157,7 @@ Then, when all tasks are defined, start the worker using :
 WKHub.startWKHUB()
 ```
 
-When the workers are started, you should see the Load Balancer console displaying massages like {+LB - ADDING WORKER (worker_c0b28c1f)+}
+When the workers are started, you should see the Load Balancer console displaying massages like `LB - ADDING WORKER (worker_c0b28c1f)`
 
 ---
 
