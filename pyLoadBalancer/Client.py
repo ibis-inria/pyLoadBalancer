@@ -32,6 +32,8 @@ import os.path
 import json
 import time
 import traceback
+from .colorprint import cprint
+import sys
 
 __all__ = ['Client']  # Only possible to import Client
 

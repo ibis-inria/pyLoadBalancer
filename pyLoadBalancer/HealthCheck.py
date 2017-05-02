@@ -156,7 +156,7 @@ class HealthCheck:
             pass
 
         if not self.workers:
-            cprint('HC - WARNING : LB HAS NO WORKERS', 'FAIL')
+            cprint('HC - WARNING : LB HAS NO WORKERS', 'WARNING')
         else:
             self.checkWorkers()
 

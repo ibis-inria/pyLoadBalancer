@@ -1,18 +1,30 @@
 # pyLoadBalancer
 
-This package contains a LoadBalancer that allows a list of tasks to be distributed to Workers.
+### Licence
 
-## Install
+pyLoadBalancer has been developped by IBIS team (INRIA Grenoble Rhône-Alpes, France) and is distributed under the [LGPL licence](https://www.gnu.org/copyleft/lesser.html).
+
+---
+
+### Install
 
 To install the pyLoadBalancer package, simply run :
 ```
 python setup.py install
 ```
 
-## Getting Started
+---
 
+### Getting Started
 
-The following scheme explains the use of the package :
+The pyLoadBalancer Package contains 5 main objects:
+1. The {+Load Balancer+}, that distribute tasks
+2. The {+Client+}, that send tasks
+3. The {+Worker+}, that receive tasks
+4. The {+Health Check+}, that check the status of the Load Balancer *(optional)*
+5. The {+Monitor+}, a small web server that displays information on the Load Balancer *(optional)*
+
+The following scheme explains the relationship:
 
 ```
 
@@ -27,120 +39,203 @@ The following scheme explains the use of the package :
 +----------+    |    |                   |     |     |          |
 | Client 2 +-------->+   Load Balancer   | <-------> | Worker 2 |
 +----------+    |    |                   |     |     |          |
-                |    +-------------------+     |     +----------+
-+----------+    |                              |
+                |    +--------^----------+     |     +----------+
++----------+    |             |                |
 | Client 3 +----+                              |     +----------+
-+----------+                                   +---> |          |
-                                                     | Worker 3 |
-    ...                                              |          |
++----------+           +------v-------+        +---> |          |
+                       |    Monitor   |              | Worker 3 |
+    ...                +--------------+              |          |
                                                      +----------+
                                                          ...
 
 ```
 
-## Classes
+All the messages between objects are exchanged in json format.
 
-The JSONLoadBalancer Package contains 4 main classes:
-1. The Load Balancer, that distribute tasks
-2. The Helth Check, that monitors the Load Balancer
-3. The Client, that send tasks
-4. The Worker, that receive tasks
+### Parameters
 
-All the messages between the classes are exchanged in json format.
+pyLoadBalancer has to be configured in order to allow the communication between the different objects (and also between different computers).
 
-## Starting the Load Balancer
+The default parameters are stored in `parameters.json` file.
 
-To start the LoadBalancer, two python scripts need to be executed :
+##### - Load Balancer parameters
 
-1. The LoadBalancer itself. Simply call the following script from command line :
-```sh
-pyLoadBalancer_LB
+- `"SOCKET_TIMEOUT" : 500` *Timeout for communication in ms (increase this values if computers are not inside the same local network)*
+- `"LB_IP": "127.0.0.1"` *IP of the LoadBalancer computer as visible for other objects of the Load Balancer, 127.0.0.1 means local computer*
+- `"LB_WKPULLPORT": 5699` *Port for communication with the workers*
+- `"LB_HCREPPORT" : 5999` *Port for communication with the healt check*
+- `"LB_CLIENTPULLPORT" : 5799` *Port for communication with clients*
+- `"LB_QUEING_MAXPERUSER" : 1000` *Maximum number of queuing task for a given user*
+
+##### - Workers parameters
+
+- `"WKHUB_IP" : "127.0.0.1"` *IP of the Worker computer as visible for the Load Balancer, 127.0.0.1 means local computer*
+- ` "WKHUB_LBPORT" : 8300` *Port for communication with the Load Balancer*
+- ` "WKHUB_HCPORT" : 8301` *Port for communication with the Health Check*
+- ` "WKHUB_WORKERS" : []` *List of workers*
+
+The list of workers is defined with the following template:
 ```
-2. The HealthCheck module that is launched by :
-```sh
-pyLoadBalancer_HC
+{"nWorkers" : Number of workers, "minP" : minimum prority, "maxP": minimum prority, "processP" : process prority}
 ```
-You should see the HealthCheck exchanging information with the LoadBalancer. As there is still no workers to do the job, the HealthCheck should print the following warning :
->HC - WARNING : LB HAS NO WORKERS.  
 
-If you get a error message, please check that the two scripts are running, and if yes, check your firewall settings
+To start 12 workers, with 3 different load balancer priorities, and one low process priority, use:
+```json
+        [ {"nWorkers" : 4, "minP" : 0, "maxP": 9, "processP" : 10},
+          {"nWorkers" : 4, "minP" : 10, "maxP": 99, "processP" : 0},
+          {"nWorkers" : 4, "minP" : 100, "maxP": 1000, "processP" : 0}
+        ],
+```
 
-Note that it is possible to execute the HealthCheck script on another computer than the LoadBalancer one. See advanced uses.
+##### - Monitor parameters
 
-## Defining Workers
+- `"MONITOR_IP": "127.0.0.1"` *IP of the Monitor computer as visible for the user that wants to monitor the load balancer, 127.0.0.1 means local computer*
+- `"MONITOR_PORT" : 9000,` *Port used to access the monitor from a web browser*
 
-Now the LoadBalancer core is running, workers have to be run. Workers are configured to connected automatically to the Load Balancer.  
-Insert a worker to your python application by using the following syntax :
+---
+
+### Starting the Load Balancer core
+
+To start the LoadBalancer on one computer, run the following command :
 
 ```python
-from JSONLoadBalancer import Worker
-WK = Worker(id, lbport, healthport)
+from pyLoadBalancer import startAll
+startAll('parameters.json')
 ```
 
-Where :
-  - `id` (string) is the worker unique id (using same id for two different workers will lead to at best only one active worker.)
-  - `lbport` (int) and `healthport` (int) are two ports listened by the worker in order to receive task from the Load Balancer and receive message from the Health Check
+Where `parameters.json` is a parameter file as defined in the previous section.
 
-Then you will redirect the task the worker will receive to the corresponding python function that will do the job.
+The `startAll()` function starts the core of the Load Balancer:
+- The {+Load Balancer+}, that distribute tasks
+- The {+Helth Check+}, that check the status of the Load Balancer *(optional)*
+- The {+Monitor+}, a small web server that displays information on the Load Balancer *(optional)*
+
+There is still no client to ask for a job and no workers to do it, the HealthCheck should therefore print the following warning :
+
+{- HC - WARNING : LB HAS NO WORKERS. -}  
+
+If you get another error message, please check check your firewall and antivirus settings that may block the communication between the Load Balancer objects.
+
+The LoadBalancer can be monitored by typing the monitor address (http://localhost:9000 by default) in a web browser.
+
+Note that it is possible to execute the core objects on separate computers. See advanced uses.
+
+---
+
+### Starting Workers
+
+Now the LoadBalancer core is running, workers have to be run. Workers are configured to connect automatically to the Load Balancer (with the help of the parameter file).
+
+Workers can be created using the following syntax :
 
 ```python
-WK.addTask('DIAG',diagTask)
+from pyLoadBalancer import WorkerHub
+WKHub = WorkerHub('parameters.json')
 ```
 
-Here, when the worker receive a task named `'DIAG'`, it will call the diagTask function.  
-A task function must be in the form :
+The workers have to learn what tasks they will perform and how to perform them. This can be done by adding a task like:
+
 ```python
-def taskFunction(**kwargs):
-    task = kwargs['tasks']
+WKHub.addTask('HELLO', helloFunction)
+```
+
+In this exemple, when the worker receive a task named `HELLO`, it will call the `helloFunction`.
+
+A task function should be in the following form:
+```python
+def helloFunction(**kwargs):
+    print('WORKER GOT TASK', kwargs)
+    result = 'Hello %s %s !' % (kwargs.get('task').get('firstName'), kwargs.get('task').get('lastName'))
     #do something with task
-    return
+    return result
 ```
-The first kwargs argurments will be `kwargs['tasks']` and contains the task message coming from the Client.
+
+kwargs arguments will contains the task sent by the Client. It can be accessed by the worker task function using `kwargs.get('task')``
 
 Then, when all tasks are defined, start the worker using :
 ```python
-WK.startWK()
+WKHub.startWKHUB()
 ```
 
-## Starting Client
+When the workers are started, you should see the Load Balancer console displaying massages like {+LB - ADDING WORKER (worker_c0b28c1f)+}
 
-Now we have a pretty consistent Load Balancer with active workers. Let's execute the Client side that will send task to the Load Balancer. Use the following syntax :
+---
+
+### Starting Client
+
+Now we have a pretty consistent Load Balancer with active workers. Let's execute the Client side that will send task to the Load Balancer. Use the following syntax:
 
 ```python
-from JSONLoadBalancer import Client
-CL = Client()
+from pyLoadBalancer import Client
+CL = Client('parameters.json')
 ```
 
-Then create the task you want to send. It simply is a python dictionnary that contains the description of the task to be done :
+Then create the task you want to send. It simply is a python dictionary that corresponds the parameters of the task function to be done :
 
 ```python
-task = {'data': '/scratch/data/matrix19160.npy', 'load': 12}
+task = {'firstName': 'John', 'lastName': 'Doe'}
 ```
 
-The dictionnary must be JSON serializable, because sockets are using json format to communicate between eachothers.  
-Note that there are two reserved keys, that are `'HELLO'` and `'TASK'`, your task dict should not contain these two keys.
-
-When the task is to be sent, send it using :
+The dictionnary must be JSON serializable, because sockets are using JSON format to communicate between each-others.  
+When the task is to be sent, send it using:
 
 ```python
-CL.sendTask(taskname,task)
+taskid = CL.sendTask('HELLO', task, userid='username').get('taskid')
 ```
 
-Where `taskname` (string) is the name of the task (the one you set for the worker side)  
+The Load Balancer will return a task unique id, that can be used to asynchronously retrieved the status of the task:
 
-## Monitoring
-A monitoring interface is available to easilly monitor the Load Balancer status (queing task, worker socket)
+```python
+taskinfo = CL.getTask(taskid)
+progress = taskinfo.get('progress')
+result = taskinfo.get('result')
+```
 
-## Advanced usages
+The returned `progress` can take the following values:
+- `None` *taskid is not correct or task result in an error*
+- `0` *task is queing*
+- `100` *task is done*
 
-- Update worker state: if long task, can send socket to LB to send worker state
-- More than one queue (manual sending to given queue by client)
-- Learning parameters (automatic queue selection by LB)
-- 
-- ...
+When the task is done, the `result` is return by the Load Balancer
 
-## Licence
+Please note that the Load Balancer automatically remove tasks whose result has been collected by the Client within 60 seconds.
 
-?
+A waiting (or processing) task can also be canceled by using the following command:
+```python
+CL.cancelTask(taskid)
+```
 
+---
 
+### Monitoring
+A monitoring interface is available to easilly monitor the Load Balancer status (queing task, statistics ...)
+
+It can be access by a web browser at the monitor address (http://localhost:9000 by default).
+
+---
+
+### Advanced usages
+
+##### - User priority
+
+The username sent by clients have an influence on the priority of the queuing tasks.
+
+When a worker is available, the first task from the user that have the lowest number of occupied worker will be processed.
+
+##### - Task priority
+A task is sent by default with a zero priority. This priority can be changed by setting the
+
+```python
+taskid = CL.sendTask('HELLO', task, userid='username', priority=100)
+```
+
+This task will only be processed by a worker that follows minP &ge; 100 and a maxP &le; 100.
+
+This behavior allows to keep available workers for high priority tasks.
+
+##### - Run on clusters of computers
+pyLoadBalancer is designed to be run in clusters of computers.
+
+Every objects of pyLoadBalancer can be run by a different computer (one computer can run the Load Balancer core, and few other computers can run each one a hub of workers).
+
+Configure the `parameters.json` in each computers in order to assign the correct IPs and ports, and be sure to open corresponding ports.
