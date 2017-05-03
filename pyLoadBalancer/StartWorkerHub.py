@@ -1,6 +1,7 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 # Starts the hub of Workers
-# tasks is a dictionnary containing :
-# { 'taskname' : taskfunction, 'tasknumber2' : taskfunction2, ...}
+
 exiting = False
 
 

@@ -5,26 +5,18 @@
 This module describes a Client.
 The Client class sends tasks (in json format from a dict) to the LoadBalancer
 
-To create a client, use the following syntax :
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-    from JSONLoadBalancer import Client
-    CL = Client()
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
 
-Then create the tasks you want to send. A task is a dict that must contains a key named 'TASK' :
-    task = {'data': '/scratch/data/matrix19160.npy', 'load': 12}
-
-You can then organize your task dict as you want, as long as the Workers are programmed to be able to understand it.
-When the task is to be sent, send it using :
-
-    taskid = CL.sendTask(taskdict)
-
-Where taskdict is a python dict describing the task to be done by the worker.
-taskid is th ID of the task unique ID returned by the Load Balancer. The task can be retrieved from the Load Balancer using the following syntax :
-
-    taskresult = CL.getTask(taskid)
-
-If the task is done, taskresult will contain the result dict returned by the Worker.
-If the task is not done, taskresult will be -1 or the completion percentage (if available)
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import zmq

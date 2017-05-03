@@ -1,3 +1,7 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+
 def startAll(pfile, returnStartFct=False):
     import os
     import sys

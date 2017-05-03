@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import tornado.auth
 import tornado.escape
 import tornado.ioloop
@@ -91,8 +94,7 @@ def startMonitorServer(parametersfile=None):
             cprint('ERROR : %s is not a valid JSON file' %
                    parametersfile, 'FAIL')
             sys.exit()
-
-    define("port", default=CONSTANTS['MONITOR_PORT'],
+            fault = CONSTANTS['MONITOR_PORT'],
            help="run on the given port", type=int)
 
     LB_HEALTHADRESS = 'tcp://' + \

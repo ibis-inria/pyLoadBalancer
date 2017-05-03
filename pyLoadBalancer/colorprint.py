@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 from colorama import Fore, Back, Style, init
 init()
 
