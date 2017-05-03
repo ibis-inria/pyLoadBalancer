@@ -2,7 +2,7 @@
 
 ### Licence
 
-pyLoadBalancer has been developped by IBIS team (INRIA Grenoble Rhône-Alpes, France) and is distributed under the [GPL licence] (https://www.gnu.org/licenses/#GPL).
+pyLoadBalancer has been developped by IBIS team (INRIA Grenoble Rhône-Alpes, France) and is distributed under the GPL licence.
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -60,7 +60,7 @@ pyLoadBalancer has to be configured in order to allow the communication between 
 
 The default parameters are stored in `parameters.json` file.
 
-##### - Load Balancer parameters
+##### Load Balancer parameters
 
 - `"SOCKET_TIMEOUT" : 500` *Timeout for communication in ms (increase this values if computers are not inside the same local network)*
 - `"LB_IP": "127.0.0.1"` *IP of the LoadBalancer computer as visible for other objects of the Load Balancer, 127.0.0.1 means local computer*
@@ -69,7 +69,7 @@ The default parameters are stored in `parameters.json` file.
 - `"LB_CLIENTPULLPORT" : 5799` *Port for communication with clients*
 - `"LB_QUEING_MAXPERUSER" : 1000` *Maximum number of queuing task for a given user*
 
-##### - Workers parameters
+##### Workers parameters
 
 - `"WKHUB_IP" : "127.0.0.1"` *IP of the Worker computer as visible for the Load Balancer, 127.0.0.1 means local computer*
 - ` "WKHUB_LBPORT" : 8300` *Port for communication with the Load Balancer*
@@ -86,10 +86,10 @@ To start 12 workers, with 3 different load balancer priorities, and one low proc
         [ {"nWorkers" : 4, "minP" : 0, "maxP": 9, "processP" : 10},
           {"nWorkers" : 4, "minP" : 10, "maxP": 99, "processP" : 0},
           {"nWorkers" : 4, "minP" : 100, "maxP": 1000, "processP" : 0}
-        ],
+        ]
 ```
 
-##### - Monitor parameters
+##### Monitor parameters
 
 - `"MONITOR_IP": "127.0.0.1"` *IP of the Monitor computer as visible for the user that wants to monitor the load balancer, 127.0.0.1 means local computer*
 - `"MONITOR_PORT" : 9000,` *Port used to access the monitor from a web browser*
@@ -218,13 +218,13 @@ It can be access by a web browser at the monitor address (http://localhost:9000 
 
 ### Advanced usages
 
-##### - User priority
+##### User priority
 
 The username sent by clients have an influence on the priority of the queuing tasks.
 
 When a worker is available, the first task from the user that have the lowest number of occupied worker will be processed.
 
-##### - Task priority
+##### Task priority
 A task is sent by default with a zero priority. This priority can be changed by setting the
 
 ```python
@@ -235,7 +235,7 @@ This task will only be processed by a worker that follows minP &ge; 100 and a ma
 
 This behavior allows to keep available workers for high priority tasks.
 
-##### - Run on clusters of computers
+##### Run on clusters of computers
 pyLoadBalancer is designed to be run in clusters of computers.
 
 Every objects of pyLoadBalancer can be run by a different computer (one computer can run the Load Balancer core, and few other computers can run each one a hub of workers).
