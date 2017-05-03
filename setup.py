@@ -38,5 +38,5 @@ setup(
     entry_points={
         'console_scripts': ['pyLoadBalancer_LB=pyLoadBalancer.LoadBalancer:main', 'pyLoadBalancer_HC=pyLoadBalancer.HealthCheck:main', 'pyLoadBalancer_Monitor=pyLoadBalancer.Monitor.MonitoringApp:main'],
     },
-    license="LGPL",
+    license="GPL",
 )
