@@ -30,10 +30,10 @@ setup(
     long_description=open('README.rst').read(),
     # use the URL to the github repo
     url='https://github.com/ibis-inria/pyLoadBalancer',
-    download_url='https://github.com/ibis-inria/pyLoadBalancer/archive/0.1.tar.gz',
+    download_url='https://github.com/ibis-inria/pyLoadBalancer/archive/0.2.tar.gz',
     keywords=['load-balancer', 'multiprocessing', 'cluster-computing',
               'clustering', 'loadbalancing', 'monitoring'],
-    install_requires=["pyzmq", "json", "tornado", "psutil", "colorama"],
+    install_requires=["pyzmq", "tornado", "psutil", "colorama"],
     include_package_data=True,
     entry_points={
         'console_scripts': ['pyLoadBalancer_LB=pyLoadBalancer.LoadBalancer:main', 'pyLoadBalancer_HC=pyLoadBalancer.HealthCheck:main', 'pyLoadBalancer_Monitor=pyLoadBalancer.Monitor.MonitoringApp:main'],
