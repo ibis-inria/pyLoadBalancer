@@ -16,9 +16,6 @@ from tornado.options import define, options
 import atexit
 import signal
 
-from tornado.wsgi import WSGIAdapter
-import wsgiref.simple_server
-
 context = zmq.Context()
 LB_HEALTHADRESS = None
 LBReqSock = None
@@ -106,6 +103,8 @@ def startMonitorServer(parametersfile=None):
     app = Application()
     WSGI = False
     if WSGI:
+        from tornado.wsgi import WSGIAdapter
+        import wsgiref.simple_server
         wsgi_app = WSGIAdapter(app)
         server = wsgiref.simple_server.make_server(
             args.adress, args.port, wsgi_app)

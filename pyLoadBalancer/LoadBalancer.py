@@ -20,7 +20,6 @@ import datetime
 import zmq
 import os.path
 import json
-import numpy as np
 from .colorprint import cprint
 import sys
 import argparse
@@ -35,38 +34,6 @@ __all__ = ['LoadBalancer']  # Only possible to import Client
 def argsort(seq):
     # http://stackoverflow.com/questions/3071415/efficient-method-to-calculate-the-rank-vector-of-a-list-in-python
     return sorted(range(len(seq)), key=seq.__getitem__)
-
-
-class learnTaskTimes:
-    def __init__(self, command):
-        self.learnParams = np.zeros((1,))
-        self.learnTimes = np.zeros((1,))
-        self.command = command
-
-    def cleanPoints(self):
-        # sqrerr =  ( np.fromiter(map(self.guessTime, self.learnParams), dtype='float') - self.learnTimes ) **2
-        # self.learnParams = self.learnParams[sqrerr < np.std(sqrerr)/2]
-        # self.learnTimes = self.learnTimes[sqrerr < np.std(sqrerr)/2]
-        self.learnTimes = self.learnTimes[::4]
-        self.learnParams = self.learnParams[::4]
-
-    def addObservation(self, param, time):
-
-        if self.learnParams.shape[0] > 200:
-            self.cleanPoints()
-
-        self.learnParams = np.append(self.learnParams, param)
-        self.learnTimes = np.append(self.learnTimes, time)
-
-        if self.learnParams.shape[0] < 5:
-            self.timesfit = np.poly1d(np.polyfit(
-                self.learnParams, self.learnTimes, 1))
-        else:
-            self.timesfit = np.poly1d(np.polyfit(
-                self.learnParams, self.learnTimes, 2))
-
-    def guessTime(self, param):
-        return self.timesfit(param)
 
 
 class LBWorker:
