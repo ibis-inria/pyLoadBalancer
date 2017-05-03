@@ -26,7 +26,7 @@ To install the pyLoadBalancer package, simply run :
 
 ::
 
-    python setup.py install
+    pip install pyLoadBalancer
 
 --------------
 
@@ -115,7 +115,7 @@ low process priority, use:
             [ {"nWorkers" : 4, "minP" : 0, "maxP": 9, "processP" : 10},
               {"nWorkers" : 4, "minP" : 10, "maxP": 99, "processP" : 0},
               {"nWorkers" : 4, "minP" : 100, "maxP": 1000, "processP" : 0}
-            ],
+            ]
 
 Monitor parameters
 ''''''''''''''''''

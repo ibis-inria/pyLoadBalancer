@@ -12,7 +12,7 @@ This program is free software: you can redistribute it and/or modify it under th
 
 To install the pyLoadBalancer package, simply run :
 ```
-python setup.py install
+pip install pyLoadBalancer
 ```
 
 ---
