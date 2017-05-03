@@ -26,7 +26,7 @@ setup(
     packages=find_packages(),
     author="Yannick Martin - INRIA IBIS",
     author_email='janiick@gmail.com',
-    description="A Load Balancer in Pure Python",
+    description="A load-balancer package for Python",
     long_description=open('README.md').read(),
     # use the URL to the github repo
     url='https://github.com/ibis-inria/pyLoadBalancer',
