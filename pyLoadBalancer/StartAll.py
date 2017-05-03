@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 
-def startAll(pfile, returnStartFct=False):
+def startAll(pfile=None, returnStartFct=False):
     import os
     import sys
     import multiprocessing

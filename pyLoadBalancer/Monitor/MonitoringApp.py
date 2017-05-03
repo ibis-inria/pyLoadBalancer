@@ -1,7 +1,5 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
-import tornado.auth
+# -*- coding: utf-8 -*-import tornado.auth
 import tornado.escape
 import tornado.ioloop
 import tornado.options
@@ -94,9 +92,9 @@ def startMonitorServer(parametersfile=None):
             cprint('ERROR : %s is not a valid JSON file' %
                    parametersfile, 'FAIL')
             sys.exit()
-            fault = CONSTANTS['MONITOR_PORT'],
-           help="run on the given port", type=int)
 
+    define("port", default=CONSTANTS['MONITOR_PORT'],
+           help="run on the given port", type=int)
     LB_HEALTHADRESS = 'tcp://' + \
         CONSTANTS['LB_IP'] + ':' + str(CONSTANTS['LB_HCREPPORT'])
     LBReqSock = context.socket(zmq.REQ)

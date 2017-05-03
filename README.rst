@@ -136,7 +136,9 @@ To start the LoadBalancer on one computer, run the following command :
 .. code:: python
 
     from pyLoadBalancer import startAll
-    startAll('parameters.json')
+    startAll()
+    # A parameter file other than the default one can be given
+    # by specifying startAll('parameters.json')
 
 Where ``parameters.json`` is a parameter file as defined in the previous
 section.
@@ -150,7 +152,7 @@ small web server that displays information on the Load Balancer
 There is still no client to ask for a job and no workers to do it, the
 HealthCheck should therefore print the following warning :
 
-{- HC - WARNING : LB HAS NO WORKERS. -}
+``HC - WARNING : LB HAS NO WORKERS.``
 
 If you get another error message, please check check your firewall and
 antivirus settings that may block the communication between the Load
@@ -176,7 +178,9 @@ Workers can be created using the following syntax :
 .. code:: python
 
     from pyLoadBalancer import WorkerHub
-    WKHub = WorkerHub('parameters.json')
+    WKHub = WorkerHub()
+    # A parameter file other than the default one can be given
+    # by specifying WorkerHub('parameters.json')
 
 The workers have to learn what tasks they will perform and how to
 perform them. This can be done by adding a task like:
@@ -222,7 +226,9 @@ the following syntax:
 .. code:: python
 
     from pyLoadBalancer import Client
-    CL = Client('parameters.json')
+    CL = Client()
+    # A parameter file other than the default one can be given
+    # by specifying Client('parameters.json')
 
 Then create the task you want to send. It simply is a python dictionary
 that corresponds the parameters of the task function to be done :
@@ -248,9 +254,11 @@ asynchronously retrieved the status of the task:
     progress = taskinfo.get('progress')
     result = taskinfo.get('result')
 
-The returned ``progress`` can take the following values: - ``None``
-*taskid is not correct or task result in an error* - ``0`` *task is
-queing* - ``100`` *task is done*
+The returned ``progress`` can take the following values:
+
+-  ``None`` *taskid is not correct or task result in an error*
+-  ``0`` *task is queing*
+-  ``100`` *task is done*
 
 When the task is done, the ``result`` is return by the Load Balancer
 
@@ -313,5 +321,6 @@ Every objects of pyLoadBalancer can be run by a different computer (one
 computer can run the Load Balancer core, and few other computers can run
 each one a hub of workers).
 
-Configure the ``parameters.json`` in each computers in order to assign
-the correct IPs and ports, and be sure to open corresponding ports.
+Configure a ``parameters.json`` file in each computers in order to
+assign the correct IPs and ports, and be sure to open corresponding
+ports.
