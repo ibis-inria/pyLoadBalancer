@@ -39,4 +39,22 @@ setup(
         'console_scripts': ['pyLoadBalancer_LB=pyLoadBalancer.LoadBalancer:main', 'pyLoadBalancer_HC=pyLoadBalancer.HealthCheck:main', 'pyLoadBalancer_Monitor=pyLoadBalancer.Monitor.MonitoringApp:main'],
     },
     license="GPL",
+    classifiers=[
+        'Development Status :: 4 - Beta',
+        'Environment :: Console',
+        'Environment :: Web Environment',
+        'Intended Audience :: Science/Research',
+        'Intended Audience :: Developers',
+        'Intended Audience :: System Administrators',
+        'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
+        'Natural Language :: English',
+        'Operating System :: MacOS :: MacOS X',
+        'Operating System :: Microsoft :: Windows',
+        'Operating System :: POSIX',
+        'Programming Language :: Python',
+        'Topic :: Software Development',
+        'Topic :: Scientific/Engineering',
+        'Topic :: Utilities',
+        'Topic :: System :: Hardware :: Symmetric Multi-processing'
+    ],
 )
